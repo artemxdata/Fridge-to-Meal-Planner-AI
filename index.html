@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fridge-to-Meal Planner AI</title>
+  <style>
+    :root {
+      --bg: #f5f6f8;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #d9dee7;
+      --green: #147a5c;
+      --green-dark: #0f5e46;
+      --blue: #2457c5;
+      --red: #b42318;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid var(--line);
+      padding: 18px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    h1 { margin: 0; font-size: 24px; }
+    h2 { margin: 0 0 12px; font-size: 18px; }
+    .sub { margin-top: 6px; color: var(--muted); max-width: 920px; line-height: 1.45; }
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 22px;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 18px;
+    }
+    section, aside {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .stack { display: grid; gap: 14px; }
+    .grid { display: grid; gap: 10px; }
+    .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+    input, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 11px;
+      font-size: 14px;
+      background: #fff;
+      color: var(--ink);
+    }
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: var(--green);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: var(--green-dark); }
+    button.secondary { background: var(--blue); }
+    button.danger { background: var(--red); }
+    button.light { background: #edf2f7; color: var(--ink); }
+    .row {
+      display: grid;
+      grid-template-columns: 1.4fr .6fr .6fr .7fr 44px;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .candidate {
+      display: grid;
+      grid-template-columns: 28px 1fr .65fr .65fr .8fr;
+      gap: 8px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: #fafbfc;
+    }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: #eef4ff;
+      color: #1d4ed8;
+      font-size: 12px;
+      margin: 2px;
+    }
+    .muted { color: var(--muted); }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    .day {
+      border-left: 4px solid var(--green);
+    }
+    .meal-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 700;
+    }
+    .shopping {
+      display: grid;
+      grid-template-columns: 120px 1fr 90px;
+      gap: 8px;
+      padding: 8px 0;
+      border-bottom: 1px solid #edf0f4;
+    }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr 80px 70px 90px 44px; }
+      .candidate { grid-template-columns: 28px 1fr; }
+      .cols { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fridge-to-Meal Planner AI</h1>
+    <div class="sub">MVP: загрузите фото или включите demo, подтвердите ингредиенты, задайте бюджет и цели, получите план питания на 3 дня, список покупок и объяснение выбора.</div>
+  </header>
+
+  <main>
+    <aside class="stack">
+      <section class="stack">
+        <h2>1. Фото и распознавание</h2>
+        <label>API URL
+          <input id="baseUrl" value="http://127.0.0.1:8000" />
+        </label>
+        <label>Фото холодильника или продуктов
+          <input id="photoInput" type="file" accept="image/*" />
+        </label>
+        <label>Текстовая подсказка для fallback/OCR mock
+          <input id="textHint" placeholder="например: яйца, йогурт, курица, картофель" />
+        </label>
+        <div class="toolbar">
+          <button onclick="analyzePhoto()">Распознать фото</button>
+          <button class="secondary" onclick="loadDemo()">Demo сценарий</button>
+        </div>
+        <div id="visionStatus" class="status"></div>
+        <div id="candidates"></div>
+        <button class="light" onclick="confirmCandidates()">Добавить отмеченные в холодильник</button>
+      </section>
+
+      <section>
+        <h2>2. Подтвержденный холодильник</h2>
+        <div id="pantryRows"></div>
+        <div class="toolbar">
+          <button class="light" onclick="addItem()">Добавить вручную</button>
+          <button class="danger" onclick="clearPantry()">Очистить</button>
+        </div>
+      </section>
+
+      <section class="stack">
+        <h2>3. Цели и ограничения</h2>
+        <div class="grid cols">
+          <label>Бюджет в день, руб.
+            <input id="budget" type="number" value="520" min="100" />
+          </label>
+          <label>Сезон
+            <select id="season">
+              <option value="">Любой</option>
+              <option value="spring">Весна</option>
+              <option value="summer">Лето</option>
+              <option value="autumn">Осень</option>
+              <option value="winter">Зима</option>
+            </select>
+          </label>
+          <label>Калории в день
+            <input id="calories" type="number" value="1800" />
+          </label>
+          <label>Белок в день, г
+            <input id="protein" type="number" value="95" />
+          </label>
+        </div>
+        <button onclick="generateThreeDayPlan()">Сгенерировать план на 3 дня</button>
+      </section>
+    </aside>
+
+    <section class="stack">
+      <section>
+        <h2>План питания на 3 дня</h2>
+        <div id="summary" class="status"></div>
+        <div id="plan"></div>
+      </section>
+
+      <section>
+        <h2>Список покупок и зачем это нужно</h2>
+        <div id="shopping"></div>
+      </section>
+
+      <section>
+        <h2>Статистика</h2>
+        <div id="stats" class="status"></div>
+        <ul id="notes"></ul>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    let pantry = [];
+    let candidates = [];
+
+    const el = (id) => document.getElementById(id);
+    const apiBase = () => el("baseUrl").value.trim() || "http://127.0.0.1:8000";
+
+    function savePantry() {
+      localStorage.setItem("ftm_pantry", JSON.stringify(pantry));
+    }
+
+    function loadPantry() {
+      try {
+        pantry = JSON.parse(localStorage.getItem("ftm_pantry") || "[]");
+      } catch {
+        pantry = [];
+      }
+    }
+
+    function addItem(item) {
+      pantry.push(item || { name: "", quantity: 1, unit: "шт", expires_in_days: 7, source: "manual", confidence: null });
+      savePantry();
+      renderPantry();
+    }
+
+    function removeItem(index) {
+      pantry.splice(index, 1);
+      savePantry();
+      renderPantry();
+    }
+
+    function clearPantry() {
+      pantry = [];
+      savePantry();
+      renderPantry();
+    }
+
+    function renderPantry() {
+      const box = el("pantryRows");
+      box.innerHTML = "";
+      if (!pantry.length) {
+        box.innerHTML = '<div class="muted">Пока нет подтвержденных продуктов.</div>';
+        return;
+      }
+      pantry.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "row";
+        row.innerHTML = `
+          <input value="${item.name || ""}" placeholder="продукт" oninput="pantry[${index}].name=this.value; savePantry()" />
+          <input type="number" step="0.1" value="${item.quantity || 1}" oninput="pantry[${index}].quantity=Number(this.value||1); savePantry()" />
+          <input value="${item.unit || "шт"}" oninput="pantry[${index}].unit=this.value; savePantry()" />
+          <input type="number" value="${item.expires_in_days ?? ""}" placeholder="дни" oninput="pantry[${index}].expires_in_days=Number(this.value||0); savePantry()" />
+          <button class="danger" onclick="removeItem(${index})">X</button>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function renderCandidates() {
+      const box = el("candidates");
+      box.innerHTML = "";
+      if (!candidates.length) {
+        box.innerHTML = '<div class="muted">Нет кандидатов. Используйте demo или введите продукты вручную.</div>';
+        return;
+      }
+      candidates.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "candidate";
+        row.innerHTML = `
+          <input type="checkbox" checked id="cand-${index}" />
+          <input value="${item.name}" oninput="candidates[${index}].name=this.value" />
+          <input type="number" step="0.1" value="${item.quantity || 1}" oninput="candidates[${index}].quantity=Number(this.value||1)" />
+          <input value="${item.unit || "шт"}" oninput="candidates[${index}].unit=this.value" />
+          <div class="muted">${Math.round((item.confidence || 0) * 100)}% · ${item.reason || item.source}</div>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function confirmCandidates() {
+      candidates.forEach((item, index) => {
+        const checked = el(`cand-${index}`)?.checked;
+        if (checked) addItem({ ...item, source: item.source || "vision" });
+      });
+      candidates = [];
+      renderCandidates();
+      el("visionStatus").textContent = "Ингредиенты добавлены. Их можно отредактировать вручную перед генерацией плана.";
+    }
+
+    async function analyzePhoto() {
+      const file = el("photoInput").files[0];
+      if (!file) {
+        el("visionStatus").textContent = "Выберите фото или нажмите Demo сценарий.";
+        return;
+      }
+      const form = new FormData();
+      form.append("file", file);
+      form.append("mode", "auto");
+      form.append("text_hint", el("textHint").value || "");
+      el("visionStatus").textContent = "Анализирую фото...";
+      const res = await fetch(`${apiBase()}/api/v2/vision/analyze`, { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        el("visionStatus").textContent = data.detail || "Ошибка анализа фото";
+        return;
+      }
+      candidates = data.items || [];
+      el("visionStatus").textContent = `Найдено кандидатов: ${candidates.length}. Fallback: ${data.fallback}. Подтвердите список вручную.`;
+      renderCandidates();
+    }
+
+    async function loadDemo() {
+      const res = await fetch(`${apiBase()}/api/v2/demo`);
+      const data = await res.json();
+      pantry = data.pantry || [];
+      el("budget").value = data.preferences?.budget_per_day || 520;
+      el("season").value = data.preferences?.season || "";
+      el("calories").value = data.preferences?.target_calories || 1800;
+      el("protein").value = data.preferences?.protein_goal_g || 95;
+      savePantry();
+      renderPantry();
+      el("visionStatus").textContent = data.scenario || "Demo загружен.";
+    }
+
+    async function generateThreeDayPlan() {
+      const payload = {
+        pantry,
+        budget_per_day: Number(el("budget").value || 520),
+        season: el("season").value || null,
+        target_calories: Number(el("calories").value || 1800),
+        protein_goal_g: Number(el("protein").value || 95),
+        meal_preference: "day",
+        days: 3
+      };
+      const res = await fetch(`${apiBase()}/api/v2/meal-plan/3-days`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        el("summary").textContent = data.detail || "Ошибка генерации плана";
+        return;
+      }
+      renderPlan(data);
+    }
+
+    function renderPlan(data) {
+      el("summary").innerHTML = `
+        Итого: <b>${data.totals.calories}</b> ккал, <b>${data.totals.protein_g}</b> г белка,
+        стоимость <b>${data.totals.cost}</b> руб. из лимита <b>${data.totals.budget_limit}</b> руб.
+      `;
+
+      const plan = el("plan");
+      plan.innerHTML = "";
+      data.days.forEach((day) => {
+        const wrap = document.createElement("div");
+        wrap.className = "card day";
+        let html = `<h3>${day.title}</h3>`;
+        Object.values(day.meals).forEach((meal) => {
+          const recipe = meal.recipe;
+          html += `
+            <div class="card">
+              <div class="meal-title">
+                <span>${meal.label}: ${recipe.title}</span>
+                <span>${recipe.time_min} мин · ${recipe.cost_per_serving} руб.</span>
+              </div>
+              <div>${Object.keys(recipe.ingredients).map((x) => `<span class="pill">${x}</span>`).join("")}</div>
+              <div class="muted">КБЖУ: ${recipe.nutrition.calories} ккал · Б ${recipe.nutrition.protein} · У ${recipe.nutrition.carbs} · Ж ${recipe.nutrition.fats}</div>
+              <ul>${(meal.reasons || []).map((reason) => `<li>${reason}</li>`).join("")}</ul>
+            </div>
+          `;
+        });
+        html += `<div class="muted">День: ${day.totals.calories} ккал, белок ${day.totals.protein_g} г, стоимость ${day.totals.cost} руб.</div>`;
+        wrap.innerHTML = html;
+        plan.appendChild(wrap);
+      });
+
+      const shopping = el("shopping");
+      shopping.innerHTML = "";
+      if (!data.shopping_list.length) {
+        shopping.innerHTML = '<div class="muted">Покупки не нужны: продукты уже есть дома.</div>';
+      } else {
+        data.shopping_list.forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "shopping";
+          row.innerHTML = `
+            <b>${item.category}</b>
+            <div>${item.name}<div class="muted">${item.reason}</div></div>
+            <span>${item.missing_quantity} ${item.unit}</span>
+          `;
+          shopping.appendChild(row);
+        });
+      }
+
+      el("stats").innerHTML = `
+        Использовано продуктов из холодильника: <b>${data.statistics.pantry_usage_percent}%</b>.
+        Рецептов в плане: <b>${data.statistics.recipes_count}</b>.
+      `;
+      el("notes").innerHTML = (data.notes || []).map((note) => `<li>${note}</li>`).join("");
+    }
+
+    loadPantry();
+    if (!pantry.length) {
+      pantry = [
+        { name: "яйца", quantity: 4, unit: "шт", expires_in_days: 5, source: "sample", confidence: 1 },
+        { name: "йогурт", quantity: 2, unit: "шт", expires_in_days: 3, source: "sample", confidence: 1 },
+        { name: "картофель", quantity: 3, unit: "шт", expires_in_days: 12, source: "sample", confidence: 1 }
+      ];
+      savePantry();
+    }
+    renderPantry();
+    renderCandidates();
+  </script>
+</body>
+</html>

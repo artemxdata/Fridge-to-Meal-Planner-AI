@@ -1,0 +1,60 @@
+{
+  "title": "Fridge-to-Meal Planner AI demo",
+  "description": "Demo flow: загрузка фото или fallback, подтверждение ингредиентов, план питания на 3 дня и список покупок с объяснениями.",
+  "pantry": [
+    {
+      "name": "яйца",
+      "quantity": 6,
+      "unit": "шт",
+      "expires_in_days": 5,
+      "source": "demo",
+      "confidence": 0.96
+    },
+    {
+      "name": "йогурт",
+      "quantity": 2,
+      "unit": "шт",
+      "expires_in_days": 3,
+      "source": "demo",
+      "confidence": 0.92
+    },
+    {
+      "name": "курица",
+      "quantity": 1,
+      "unit": "порция",
+      "expires_in_days": 2,
+      "source": "demo",
+      "confidence": 0.86
+    },
+    {
+      "name": "картофель",
+      "quantity": 4,
+      "unit": "шт",
+      "expires_in_days": 12,
+      "source": "demo",
+      "confidence": 0.82
+    },
+    {
+      "name": "морковь",
+      "quantity": 2,
+      "unit": "шт",
+      "expires_in_days": 10,
+      "source": "demo",
+      "confidence": 0.78
+    },
+    {
+      "name": "лук",
+      "quantity": 2,
+      "unit": "шт",
+      "expires_in_days": 15,
+      "source": "demo",
+      "confidence": 0.74
+    }
+  ],
+  "preferences": {
+    "budget_per_day": 520,
+    "target_calories": 1800,
+    "protein_goal_g": 95,
+    "days": 3
+  }
+}
