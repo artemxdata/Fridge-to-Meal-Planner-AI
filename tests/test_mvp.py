@@ -5,7 +5,6 @@ from PIL import Image
 
 from run_ultra_smart_app import app
 
-
 client = TestClient(app)
 
 

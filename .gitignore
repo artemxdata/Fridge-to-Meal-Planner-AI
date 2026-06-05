@@ -55,6 +55,14 @@ Thumbs.db
 *.log
 logs/
 
+# Private runtime data
+uploads/
+receipts/
+artifacts/
+data/private/
+data/feedback/
+.local/
+
 # Database
 *.db
 *.sqlite3

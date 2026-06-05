@@ -1,5 +1,7 @@
 .env
 .env.*
+.git/
+.github/
 .venv/
 venv/
 env/
@@ -9,6 +11,14 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 htmlcov/
+tests/
+docs/
+uploads/
+receipts/
+artifacts/
+data/private/
+data/feedback/
+.local/
 *.log
 *.tmp
 *.temp

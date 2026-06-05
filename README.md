@@ -1,123 +1,146 @@
 # Fridge-to-Meal Planner AI
 
-AI-assisted meal planner that turns a home pantry into a practical weekly meal plan.
+[![CI](https://github.com/artemxdata/Fridge-to-Meal-Planner-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/artemxdata/Fridge-to-Meal-Planner-AI/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
+[![Human controlled](https://img.shields.io/badge/AI-human--controlled-147a5c.svg)](#trust-model)
 
-The project is being rebuilt from a prototype into a GitHub portfolio MVP: upload or enter available products, confirm the pantry, set budget and nutrition goals, generate meal ideas, and get a shopping list for missing ingredients.
+Human-controlled food operations copilot for people who do not want to spend mental energy deciding what
+to cook or buy.
 
-## Current Status
+The system observes possible pantry items, asks the user to confirm facts, and produces several explainable
+meal-plan drafts. AI can suggest and explain; it cannot silently change the pantry, approve a plan, or create
+a final shopping list.
 
-This repository currently contains a working prototype:
+## Current Product Increment
 
-- FastAPI backend with recipe suggestion and daily meal planning.
-- Static HTML frontend for manual pantry input.
-- Russian recipe dataset with calories, protein, carbs, fats, season tags, cooking time, and estimated cost.
-- Simple photo analysis endpoint based on Pillow and fallback heuristics.
+- Upload a fridge/product photo and receive low-confidence ingredient candidates.
+- Confirm or edit ingredients manually before using them.
+- Generate a three-day meal plan and explained shopping list.
+- Interpret RU/EN context such as `устал, хочу тёплое без магазина` into visible proposed constraints.
+- Compare three planning strategies: simple, waste-first, and balanced.
+- Inspect a decision trace for every v3 plan option.
+- Run without an LLM, external API, GPU, or model weights.
 
-The computer vision module is not the core MVP yet. The reliable flow is manual pantry input plus user confirmation. Vision should be treated as an optional demo/assistant feature.
+## Trust Model
 
-## Features
+```text
+Observation -> Candidate facts -> Human confirmation -> Deterministic planning
+            -> Explainable draft options -> Human approval
+```
 
-- Suggest a recipe from available pantry items.
-- Build a daily meal plan by budget, season and nutrition goals.
-- Calculate total calories, protein, carbs, fats and estimated cost.
-- Show missing ingredients for shopping.
-- Store pantry state in browser `localStorage`.
-- Photo upload flow with simple color/text fallback and manual confirmation.
+- Vision output is always a candidate and always has `needs_confirmation=true`.
+- V3 plans are always drafts and always have `requires_approval=true`.
+- Context interpretation proposes structured constraints but requires confirmation.
+- Existing `/api/v2/*` contracts remain available while the product evolves through `/api/v3/*`.
 
-## Tech Stack
+## Architecture
 
-- Python
-- FastAPI
-- Pydantic
-- Uvicorn
-- HTML/CSS/JavaScript
-- Pillow-based image fallback for the MVP
-- Pytest for future tests
+```text
+app/
+├── api/          # FastAPI transport layer and versioned routes
+├── services/     # deterministic planning, vision fallback, context interpretation
+├── catalog.py    # recipe catalog and ingredient normalization
+├── config.py     # environment-backed safe defaults
+├── schemas.py    # public request/response contracts
+└── main.py       # application factory, health checks, middleware
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries, current limitations, and the target direction.
 
 ## Quick Start
 
-Create and activate a virtual environment:
+Python 3.11-3.13 is recommended for development. The lightweight core also runs on the current local
+Python 3.14 environment, but the optional CV stack may not.
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Install dependencies:
-
-```powershell
-pip install -r requirements.txt
-```
-
-Run the API:
-
-```powershell
+python -m pip install -r requirements-dev.txt
 python run_ultra_smart_app.py
 ```
 
-Open API docs:
+Open:
 
-```text
-http://127.0.0.1:8000/docs
+- Product demo: `http://127.0.0.1:8000/app`
+- Swagger: `http://127.0.0.1:8000/docs`
+- Readiness: `http://127.0.0.1:8000/health/ready`
+
+Docker:
+
+```bash
+docker compose up --build
 ```
 
-Open `index.html` in a browser and keep the API base URL as:
+Docker Compose starts the FastAPI app on `:8000` and a local PostgreSQL 16 database for v3 pantry/audit
+persistence.
 
-```text
-http://127.0.0.1:8000
+## API Examples
+
+Interpret human context without applying it:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v3/assistant/interpret-context \
+  -H "Content-Type: application/json" \
+  -d '{"text":"Я устал, хочу тёплое без магазина"}'
 ```
 
-## API Endpoints
+Generate three explainable draft options:
 
-Current endpoints:
+```bash
+curl -X POST http://127.0.0.1:8000/api/v3/plans/options \
+  -H "Content-Type: application/json" \
+  -d '{"pantry":[{"name":"яйца","quantity":6},{"name":"картофель","quantity":4}],"budget_per_day":520}'
+```
 
-- `GET /` - health/status response.
-- `GET /api/v2/recipes/sample` - sample recipes.
-- `POST /api/v2/suggest` - suggest one recipe.
-- `POST /api/v2/plan` - build a daily meal plan.
+## Development Checks
 
-Planned MVP endpoints:
+```powershell
+.\.venv\Scripts\ruff.exe check app tests run_ultra_smart_app.py
+.\.venv\Scripts\black.exe --check app tests run_ultra_smart_app.py
+.\.venv\Scripts\python.exe -m pytest -q
+```
 
-- `POST /api/v2/weekly-plan`
-- `POST /api/v2/shopping-list`
-- `POST /api/v2/statistics/summary`
-- `POST /api/v2/vision/analyze`
+Dependencies are separated by purpose:
 
-## Computer Vision Notes
+- `requirements.txt` - lightweight runtime.
+- `requirements-dev.txt` - tests, lint, formatting.
+- `requirements-vision.txt` - optional experimental YOLO/OpenCV stack.
 
-The current MVP uses a lightweight fallback approach instead of requiring expensive or heavy computer vision dependencies.
+## Persistence
 
-For the MVP, the expected flow is:
+The app now has a real persistence foundation:
 
-1. User enters products manually or uploads a photo in demo/experimental mode.
-2. The system proposes detected ingredients with confidence.
-3. User confirms or edits the list.
-4. Only confirmed products are used for planning.
+- `GET /api/v3/households/demo` creates a demo household and seeds confirmed pantry lots.
+- `GET /api/v3/households/{household_id}/pantry` returns confirmed pantry lots.
+- `POST /api/v3/households/{household_id}/pantry/confirm` records user-confirmed pantry items.
+- `GET /api/v3/households/{household_id}/audit-events` returns append-only audit events.
 
-This avoids pretending that generic computer vision can reliably identify products like cottage cheese, kefir, flour, buckwheat or exact packaged goods without a trained dataset or paid vision API.
+Local Python uses SQLite by default. Docker Compose uses PostgreSQL. Both paths use the same async
+SQLAlchemy models and v3 API.
 
-## Security
+## Current Limitations
 
-Do not commit local secrets.
-
-Ignored local files include:
-
-- `.env`
-- `.venv/`
-- model weights like `*.pt`
-- cache and build artifacts
-
-Use `.env.example` for public configuration examples when it is added.
+- The static frontend demonstrates the v2 flow and does not yet expose v3 option comparison.
+- Pantry confirmations and audit events are persisted; plan approvals and overrides are not fully modeled yet.
+- The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
+- Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
+- Docker Compose is verified locally with the FastAPI app and PostgreSQL service.
 
 ## Roadmap
 
-- Refactor backend into `app/` package.
-- Add weekly meal planning.
-- Add structured shopping list with categories and estimated cost.
-- Add nutrition and budget dashboard.
-- Improve upload/demo vision endpoint with user confirmation.
-- Add tests and CI.
-- Fix Docker entrypoint and add `.dockerignore`.
-- Add PostgreSQL, Redis and Alembic only after persistent user data is implemented.
-- Add optional OCR for receipts and labels.
-- Add Telegram or n8n integration for portfolio extensions.
+1. Add first-class approval and override event types for plan and shopping-list decisions.
+2. Replace the static frontend with a bilingual React PWA.
+3. Add policy-driven hard constraints and OR-Tools optimization.
+4. Add barcode and receipt OCR before training custom computer vision.
+5. Build opt-in feedback datasets, ranking, and waste-risk models.
+
+## Security
+
+Never commit `.env`, `.venv`, cache files, local databases, model weights, uploaded photos, or receipts.
+Use `.env.example` for public configuration. Raw user images must be treated as private and should be deleted
+after processing unless the user explicitly opts into retention.
+
+## License
+
+MIT
