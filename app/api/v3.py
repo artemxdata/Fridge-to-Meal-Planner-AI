@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.schemas import (
+    AcceptedPlanResponse,
     ApprovalEventResponse,
     AuditEventResponse,
     ContextInterpretRequest,
@@ -16,10 +17,14 @@ from app.schemas import (
     PlanOptionsRequest,
     PlanOptionsResponse,
     PlanOverrideRequest,
+    ShoppingItemDecisionRequest,
 )
 from app.services.approvals import (
+    accepted_plan_response,
     approval_event_response,
     approve_plan_option,
+    decide_shopping_item,
+    get_latest_accepted_plan,
     list_approval_events,
     override_plan_option,
 )
@@ -61,6 +66,20 @@ async def approval_events(
     return [approval_event_response(event) for event in events]
 
 
+@router.get("/households/{household_id}/plans/accepted/latest", response_model=AcceptedPlanResponse | None)
+async def latest_accepted_plan(
+    household_id: str,
+    session: SessionDep,
+) -> AcceptedPlanResponse | None:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    plan = await get_latest_accepted_plan(session, household_id)
+    if plan is None:
+        return None
+    return accepted_plan_response(plan)
+
+
 @router.post("/households/{household_id}/plans/approve", response_model=ApprovalEventResponse)
 async def approve_plan(
     household_id: str,
@@ -71,6 +90,30 @@ async def approve_plan(
     if household is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     event = await approve_plan_option(session, household_id=household_id, request=request)
+    return approval_event_response(event)
+
+
+@router.post("/households/{household_id}/shopping-list/decide", response_model=ApprovalEventResponse)
+async def decide_shopping_list_item(
+    household_id: str,
+    request: ShoppingItemDecisionRequest,
+    session: SessionDep,
+) -> ApprovalEventResponse:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    try:
+        event = await decide_shopping_item(session, household_id=household_id, request=request)
+    except IndexError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    except ValueError as exc:
+        detail = str(exc)
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in detail.lower()
+            else status.HTTP_422_UNPROCESSABLE_CONTENT
+        )
+        raise HTTPException(status_code, detail) from exc
     return approval_event_response(event)
 
 

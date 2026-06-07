@@ -90,6 +90,14 @@ def test_approve_plan_option_creates_approval_and_audit_events() -> None:
     assert event["status"] == "approved"
     assert event["target_id"] == option["option_id"]
     assert event["approved_payload"]["shopping_list"] == option["plan"]["shopping_list"]
+    assert event["approved_payload"]["accepted_plan_id"]
+
+    accepted = client.get(f"/api/v3/households/{household_id}/plans/accepted/latest")
+    assert accepted.status_code == 200
+    accepted_plan = accepted.json()
+    assert accepted_plan["id"] == event["approved_payload"]["accepted_plan_id"]
+    assert accepted_plan["option_id"] == option["option_id"]
+    assert accepted_plan["shopping_list_payload"] == option["plan"]["shopping_list"]
 
     approval_events = client.get(f"/api/v3/households/{household_id}/approval-events").json()
     assert any(item["id"] == event["id"] for item in approval_events)
@@ -97,6 +105,59 @@ def test_approve_plan_option_creates_approval_and_audit_events() -> None:
     audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
     assert any(
         item["event_type"] == "plan_option_approved" and item["object_id"] == event["id"] for item in audit
+    )
+
+
+def test_shopping_item_decision_creates_append_only_event() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    option = _draft_plan_option()
+    approval = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={
+            "actor": "test-user",
+            "reason": "approved before shopping review",
+            "option": option,
+        },
+    ).json()
+    accepted_plan_id = approval["approved_payload"]["accepted_plan_id"]
+    item = approval["approved_payload"]["shopping_list"][0]
+
+    response = client.post(
+        f"/api/v3/households/{household_id}/shopping-list/decide",
+        json={
+            "accepted_plan_id": accepted_plan_id,
+            "item_index": 0,
+            "item_payload": item,
+            "decision": "approved",
+            "actor": "test-user",
+            "reason": "needed for approved plan",
+        },
+    )
+
+    assert response.status_code == 200
+    event = response.json()
+    assert event["event_type"] == "shopping_item_approved"
+    assert event["target_type"] == "shopping_item"
+    assert event["status"] == "approved"
+    assert event["approved_payload"]["accepted_plan_id"] == accepted_plan_id
+    assert event["approved_payload"]["item_index"] == 0
+
+    changed_without_payload = client.post(
+        f"/api/v3/households/{household_id}/shopping-list/decide",
+        json={
+            "accepted_plan_id": accepted_plan_id,
+            "item_index": 0,
+            "item_payload": item,
+            "decision": "changed",
+            "actor": "test-user",
+            "reason": "replace this item",
+        },
+    )
+    assert changed_without_payload.status_code == 422
+
+    audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
+    assert any(
+        item["event_type"] == "shopping_item_approved" and item["object_id"] == event["id"] for item in audit
     )
 
 
@@ -151,6 +212,7 @@ def test_unknown_household_returns_404() -> None:
 def test_unknown_household_returns_404_for_plan_decisions() -> None:
     option = _draft_plan_option()
     approval_events = client.get("/api/v3/households/unknown-household/approval-events")
+    latest_plan = client.get("/api/v3/households/unknown-household/plans/accepted/latest")
     approve = client.post(
         "/api/v3/households/unknown-household/plans/approve",
         json={"option": option},
@@ -163,7 +225,19 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
             "override_payload": {"replacement": "omelet"},
         },
     )
+    shopping_decision = client.post(
+        "/api/v3/households/unknown-household/shopping-list/decide",
+        json={
+            "accepted_plan_id": "missing",
+            "item_index": 0,
+            "item_payload": {"name": "eggs"},
+            "decision": "approved",
+            "reason": "needed",
+        },
+    )
 
     assert approval_events.status_code == 404
+    assert latest_plan.status_code == 404
     assert approve.status_code == 404
     assert override.status_code == 404
+    assert shopping_decision.status_code == 404

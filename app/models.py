@@ -37,6 +37,10 @@ class Household(Base):
         back_populates="household",
         cascade="all, delete-orphan",
     )
+    accepted_plans: Mapped[list[AcceptedPlan]] = relationship(
+        back_populates="household",
+        cascade="all, delete-orphan",
+    )
     audit_events: Mapped[list[AuditEvent]] = relationship(
         back_populates="household",
         cascade="all, delete-orphan",
@@ -95,3 +99,21 @@ class ApprovalEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
     household: Mapped[Household] = relationship(back_populates="approval_events")
+
+
+class AcceptedPlan(Base):
+    __tablename__ = "accepted_plans"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    source_approval_event_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    option_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    strategy: Mapped[str] = mapped_column(String(40), nullable=False)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
+    plan_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    shopping_list_payload: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    household: Mapped[Household] = relationship(back_populates="accepted_plans")

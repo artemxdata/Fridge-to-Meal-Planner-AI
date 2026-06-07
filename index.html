@@ -205,10 +205,17 @@
 
     .shopping-item {
       display: grid;
-      grid-template-columns: 1fr 88px;
+      grid-template-columns: 1fr auto;
       gap: 8px;
       padding: 8px 0;
       border-bottom: 1px solid #edf0f4;
+    }
+
+    .shopping-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
     }
 
     .events {
@@ -341,6 +348,12 @@
         </div>
         <div id="events" class="events"></div>
       </section>
+
+      <section>
+        <h2>Accepted Plan</h2>
+        <div id="acceptedPlanStatus" class="status"></div>
+        <div id="acceptedPlan"></div>
+      </section>
     </section>
   </main>
 
@@ -349,6 +362,7 @@
     let pantry = [];
     let candidates = [];
     let planOptions = [];
+    let acceptedPlan = null;
     let lastDecision = null;
 
     const el = (id) => document.getElementById(id);
@@ -496,6 +510,7 @@
         householdId = household.id;
         el("workspaceStatus").textContent = `Household: ${household.name}`;
         updateMetrics();
+        await loadAcceptedPlan();
         await loadApprovalEvents();
       } catch (err) {
         el("workspaceStatus").textContent = err.message;
@@ -692,6 +707,7 @@
         lastDecision = event;
         el("planStatus").textContent = `Approved: ${event.target_id}`;
         updateMetrics();
+        await loadAcceptedPlan();
         await loadApprovalEvents();
       } catch (err) {
         el("planStatus").textContent = err.message;
@@ -724,9 +740,100 @@
         lastDecision = event;
         el("planStatus").textContent = `Overridden: ${event.target_id}`;
         updateMetrics();
+        await loadAcceptedPlan();
         await loadApprovalEvents();
       } catch (err) {
         el("planStatus").textContent = err.message;
+      }
+    }
+
+    async function loadAcceptedPlan() {
+      if (!householdId) return;
+      try {
+        acceptedPlan = await api(`/api/v3/households/${householdId}/plans/accepted/latest`);
+        renderAcceptedPlan();
+      } catch (err) {
+        el("acceptedPlanStatus").textContent = err.message;
+      }
+    }
+
+    function renderAcceptedPlan() {
+      const box = el("acceptedPlan");
+      if (!acceptedPlan) {
+        el("acceptedPlanStatus").textContent = "No accepted plan yet.";
+        box.innerHTML = "";
+        return;
+      }
+
+      const totals = acceptedPlan.plan_payload?.totals || {};
+      el("acceptedPlanStatus").innerHTML = `
+        <span class="pill green">${escapeHtml(acceptedPlan.status)}</span>
+        <span class="pill">${escapeHtml(acceptedPlan.strategy)}</span>
+        <span class="pill">${escapeHtml(totals.cost || 0)} rub</span>
+        <span class="pill">${escapeHtml(totals.protein_g || 0)}g protein</span>
+      `;
+      box.innerHTML = `
+        <h3>${escapeHtml(acceptedPlan.title)}</h3>
+        <div class="small muted">Accepted from ${escapeHtml(acceptedPlan.option_id)} · ${escapeHtml(acceptedPlan.created_at)}</div>
+        <h3>Shopping item decisions</h3>
+        ${renderAcceptedShopping(acceptedPlan.shopping_list_payload || [])}
+      `;
+    }
+
+    function renderAcceptedShopping(items) {
+      if (!items.length) {
+        return '<div class="muted">No missing ingredients in accepted plan.</div>';
+      }
+      return items.map((item, index) => `
+        <div class="shopping-item">
+          <div>
+            <b>${escapeHtml(item.name)}</b>
+            <div class="small muted">${escapeHtml(item.reason)}</div>
+            <div class="small muted">${escapeHtml(item.missing_quantity)} ${escapeHtml(item.unit)}</div>
+          </div>
+          <div class="shopping-actions">
+            <button class="light" onclick="decideShoppingItem(${index}, 'approved')">Approve</button>
+            <button class="light" onclick="decideShoppingItem(${index}, 'skipped')">Skip</button>
+            <button class="warn" onclick="decideShoppingItem(${index}, 'changed')">Change</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function decideShoppingItem(index, decision) {
+      if (!acceptedPlan) {
+        el("acceptedPlanStatus").textContent = "Approve a plan first.";
+        return;
+      }
+      const item = acceptedPlan.shopping_list_payload[index];
+      let reason = decision === "approved" ? "needed for accepted plan" : "user adjusted shopping item";
+      let overridePayload = {};
+      if (decision === "changed") {
+        const replacement = prompt("Replacement or change note", "buy a cheaper alternative");
+        if (!replacement) return;
+        overridePayload = { replacement, source: "frontend_demo" };
+      }
+
+      try {
+        const event = await api(`/api/v3/households/${householdId}/shopping-list/decide`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            accepted_plan_id: acceptedPlan.id,
+            item_index: index,
+            item_payload: item,
+            decision,
+            actor: "demo-user",
+            reason,
+            override_payload: overridePayload,
+          }),
+        });
+        lastDecision = event;
+        el("acceptedPlanStatus").textContent = `${event.event_type}: ${item.name}`;
+        updateMetrics();
+        await loadApprovalEvents();
+      } catch (err) {
+        el("acceptedPlanStatus").textContent = err.message;
       }
     }
 

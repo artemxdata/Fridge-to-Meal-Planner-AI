@@ -198,3 +198,30 @@ class ApprovalEventResponse(BaseModel):
     approved_payload: dict[str, Any]
     override_payload: dict[str, Any]
     created_at: str
+
+
+class AcceptedPlanResponse(BaseModel):
+    id: str
+    household_id: str
+    source_approval_event_id: str
+    option_id: str
+    strategy: str
+    title: str
+    status: str
+    plan_payload: dict[str, Any]
+    shopping_list_payload: list[dict[str, Any]]
+    created_at: str
+    updated_at: str
+
+
+ShoppingDecisionStatus = Literal["approved", "skipped", "changed"]
+
+
+class ShoppingItemDecisionRequest(BaseModel):
+    accepted_plan_id: str = Field(min_length=1, max_length=120)
+    item_index: int = Field(ge=0, le=500)
+    item_payload: dict[str, Any] = Field(default_factory=dict)
+    decision: ShoppingDecisionStatus
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(min_length=3, max_length=500)
+    override_payload: dict[str, Any] = Field(default_factory=dict)

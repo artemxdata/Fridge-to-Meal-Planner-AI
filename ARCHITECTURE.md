@@ -32,7 +32,7 @@ Responsibilities:
 
 The legacy `run_ultra_smart_app.py` remains a compatibility entrypoint only.
 The static `index.html` is a demo surface for the v3 human-control workflow: context interpretation,
-option comparison, approval, override, and approval-event history.
+option comparison, accepted plan state, item-level shopping decisions, and approval-event history.
 
 ## API Versions
 
@@ -76,15 +76,16 @@ Implemented now:
 
 - demo household;
 - confirmed pantry lots;
+- latest accepted plan state after explicit plan approval;
 - append-only approval events for plan approval and override;
-- append-only audit events for household creation, pantry confirmation, and plan decisions.
+- append-only approval events for item-level shopping decisions;
+- append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions.
 
 Still planned:
 
 - households and users;
 - purchase events;
 - observation sessions and candidates;
-- durable accepted plans and shopping lists;
 - consent events.
 
 All records must be scoped by `household_id`. Cross-household access tests are mandatory before exposing
@@ -101,7 +102,7 @@ authentication.
 
 ## Known Gaps
 
-- No item-level shopping-list approval workflow yet.
+- No production migrations for schema evolution yet.
 - No authentication or household isolation yet.
 - No policy YAML or hard allergy constraints yet.
 - No React PWA or offline state management yet.

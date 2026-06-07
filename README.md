@@ -21,6 +21,7 @@ a final shopping list.
 - Compare three planning strategies: simple, waste-first, and balanced.
 - Inspect a decision trace for every v3 plan option.
 - Approve or override a draft plan from the local demo UI and inspect persisted approval events.
+- Review the accepted plan and approve, skip, or change individual shopping-list items.
 - Run without an LLM, external API, GPU, or model weights.
 
 ## Trust Model
@@ -118,6 +119,8 @@ The app now has a real persistence foundation:
 - `POST /api/v3/households/{household_id}/pantry/confirm` records user-confirmed pantry items.
 - `POST /api/v3/households/{household_id}/plans/approve` records a human-approved plan option.
 - `POST /api/v3/households/{household_id}/plans/override` records a human override for a draft plan option.
+- `GET /api/v3/households/{household_id}/plans/accepted/latest` returns the latest accepted plan.
+- `POST /api/v3/households/{household_id}/shopping-list/decide` records item-level shopping decisions.
 - `GET /api/v3/households/{household_id}/approval-events` returns append-only plan decision events.
 - `GET /api/v3/households/{household_id}/audit-events` returns append-only audit events.
 
@@ -126,19 +129,19 @@ SQLAlchemy models and v3 API.
 
 ## Current Limitations
 
-- The static frontend now demonstrates v3 option comparison and plan approval/override, but it is not yet a React PWA.
-- Plan approvals and overrides are persisted, but shopping-list item approvals are not modeled as separate UI actions yet.
+- The static frontend now demonstrates v3 option comparison, accepted plan state, and shopping-list item decisions.
+- The frontend is still a single static file, not a React PWA.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Docker Compose is verified locally with the FastAPI app and PostgreSQL service.
 
 ## Roadmap
 
-1. Add item-level approval and override events for shopping-list decisions.
-2. Replace the static frontend with a bilingual React PWA and richer state management.
-3. Add policy-driven hard constraints and OR-Tools optimization.
-4. Add barcode and receipt OCR before training custom computer vision.
-5. Build opt-in feedback datasets, ranking, and waste-risk models.
+1. Replace the static frontend with a bilingual React PWA and richer state management.
+2. Add policy-driven hard constraints and OR-Tools optimization.
+3. Add barcode and receipt OCR before training custom computer vision.
+4. Build opt-in feedback datasets, ranking, and waste-risk models.
+5. Add authentication, household isolation, and production migrations.
 
 ## Security
 
