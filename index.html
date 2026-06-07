@@ -324,6 +324,24 @@
             <input id="protein" type="number" value="95" />
           </label>
         </div>
+        <div class="grid cols">
+          <label>Allergies
+            <input id="allergies" placeholder="яйца, молоко" />
+          </label>
+          <label>Disliked ingredients
+            <input id="disliked" placeholder="лук, чеснок" />
+          </label>
+          <label>Max cooking time, min
+            <input id="maxCookingTime" type="number" min="1" max="240" placeholder="25" />
+          </label>
+          <label>Policy toggles
+            <div class="toolbar">
+              <label><input id="noShopMode" type="checkbox" /> No shop</label>
+              <label><input id="lowDishes" type="checkbox" /> Low dishes</label>
+              <label><input id="strictBudget" type="checkbox" /> Strict budget</label>
+            </div>
+          </label>
+        </div>
         <button onclick="generatePlanOptions()">Generate v3 options</button>
       </section>
     </aside>
@@ -404,6 +422,24 @@
       el("pantryMetric").textContent = pantry.length;
       el("optionsMetric").textContent = planOptions.length;
       el("decisionMetric").textContent = lastDecision?.status || "-";
+    }
+
+    function csvValues(id) {
+      return el(id).value
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+
+    function currentPolicy() {
+      return {
+        allergies: csvValues("allergies"),
+        disliked_ingredients: csvValues("disliked"),
+        max_cooking_time_min: el("maxCookingTime").value ? Number(el("maxCookingTime").value) : null,
+        no_shop_mode: el("noShopMode").checked,
+        low_dishes: el("lowDishes").checked,
+        strict_budget: el("strictBudget").checked,
+      };
     }
 
     function addItem(item) {
@@ -584,6 +620,7 @@
         meal_preference: "day",
         days: 3,
         context_note: el("contextNote").value || null,
+        policy: currentPolicy(),
       };
 
       try {

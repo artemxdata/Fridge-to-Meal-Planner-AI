@@ -39,7 +39,7 @@ from app.services.households import (
     list_pantry_lots,
     pantry_lot_response,
 )
-from app.services.planner import build_plan_options
+from app.services.planner import RecipeNotFoundError, build_plan_options
 
 router = APIRouter(prefix="/api/v3", tags=["Human-controlled planning v3"])
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -52,7 +52,10 @@ def interpret_user_context(request: ContextInterpretRequest) -> ContextInterpret
 
 @router.post("/plans/options", response_model=PlanOptionsResponse)
 def plan_options(request: PlanOptionsRequest) -> PlanOptionsResponse:
-    return build_plan_options(request)
+    try:
+        return build_plan_options(request)
+    except RecipeNotFoundError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
 
 
 @router.get("/households/{household_id}/approval-events", response_model=list[ApprovalEventResponse])

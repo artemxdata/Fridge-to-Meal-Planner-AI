@@ -14,6 +14,7 @@ from app.schemas import (
     PlanRequest,
     PlanResponse,
     PlanStrategy,
+    PolicyConstraints,
     Recipe,
     SuggestRequest,
     ThreeDayPlanRequest,
@@ -58,6 +59,66 @@ def season_ok(recipe: Recipe, season: str | None) -> bool:
     return not season or season in recipe.season_tags
 
 
+def normalized_terms(values: list[str]) -> set[str]:
+    return {normalize_name(value) for value in values if normalize_name(value)}
+
+
+def recipe_policy_violations(
+    recipe: Recipe,
+    idx: dict[str, PantryItem],
+    policy: PolicyConstraints | None,
+    budget_left: float | None = None,
+) -> list[str]:
+    if policy is None:
+        return []
+
+    ingredient_keys = {normalize_name(name) for name in recipe.ingredients}
+    violations = []
+    blocked = sorted(ingredient_keys & normalized_terms(policy.allergies))
+    avoided = sorted(ingredient_keys & normalized_terms(policy.disliked_ingredients))
+    if blocked:
+        violations.append("allergy:" + ",".join(blocked))
+    if avoided:
+        violations.append("disliked:" + ",".join(avoided))
+    if policy.max_cooking_time_min is not None and recipe.time_min > policy.max_cooking_time_min:
+        violations.append("max_cooking_time")
+    if policy.no_shop_mode and missing_ingredients(recipe, idx):
+        violations.append("no_shop_mode")
+    if policy.strict_budget and budget_left is not None and recipe.cost_per_serving > budget_left:
+        violations.append("strict_budget")
+    return violations
+
+
+def recipe_allowed_by_policy(
+    recipe: Recipe,
+    idx: dict[str, PantryItem],
+    policy: PolicyConstraints | None,
+    budget_left: float | None = None,
+) -> bool:
+    return not recipe_policy_violations(recipe, idx, policy, budget_left)
+
+
+def policy_trace(policy: PolicyConstraints | None) -> DecisionTraceItem | None:
+    if policy is None:
+        return None
+    active = {
+        "allergies": policy.allergies,
+        "disliked_ingredients": policy.disliked_ingredients,
+        "max_cooking_time_min": policy.max_cooking_time_min,
+        "no_shop_mode": policy.no_shop_mode,
+        "low_dishes": policy.low_dishes,
+        "strict_budget": policy.strict_budget,
+    }
+    active = {key: value for key, value in active.items() if value not in (None, False, [], "")}
+    if not active:
+        return None
+    return DecisionTraceItem(
+        rule="policy_constraints_applied",
+        reason="Confirmed user constraints were applied before ranking recipes.",
+        evidence=active,
+    )
+
+
 def expiry_priority(recipe: Recipe, idx: dict[str, PantryItem]) -> int:
     values = [
         max(0, item.expires_in_days)
@@ -73,6 +134,7 @@ def score_recipe(
     season: str | None,
     used_recipe_ids: set[int],
     strategy: PlanStrategy = "balanced",
+    policy: PolicyConstraints | None = None,
 ) -> float:
     missing = missing_ingredients(recipe, idx)
     score = max(0, 80 - 12 * len(missing))
@@ -88,6 +150,14 @@ def score_recipe(
     elif strategy == "waste_first":
         score += max(0, 60 - expiry_priority(recipe, idx) * 4)
         score += max(0, 30 - len(missing) * 8)
+    if policy is not None:
+        if policy.low_dishes:
+            score += max(0, 24 - len(recipe.ingredients) * 3)
+            score += max(0, 18 - recipe.time_min / 2)
+        if policy.max_cooking_time_min is not None:
+            score += max(0, policy.max_cooking_time_min - recipe.time_min)
+        if policy.no_shop_mode:
+            score -= len(missing) * 50
     if recipe.id in used_recipe_ids:
         score -= 35
     return score
@@ -109,24 +179,37 @@ def pick_recipe(
     budget_left: float,
     used_recipe_ids: set[int],
     strategy: PlanStrategy = "balanced",
+    policy: PolicyConstraints | None = None,
 ) -> Recipe:
-    candidates = [recipe for recipe in recipes() if recipe.meal == meal and season_ok(recipe, season)]
+    candidates = [
+        recipe
+        for recipe in recipes()
+        if recipe.meal == meal
+        and season_ok(recipe, season)
+        and recipe_allowed_by_policy(recipe, idx, policy, budget_left)
+    ]
     if not candidates:
         raise RecipeNotFoundError(f"Нет рецептов для типа приёма пищи: {meal}")
 
     ranked = sorted(
         candidates,
         key=lambda recipe: (
-            -score_recipe(recipe, idx, season, used_recipe_ids, strategy),
+            -score_recipe(recipe, idx, season, used_recipe_ids, strategy, policy),
             recipe.cost_per_serving,
         ),
     )
-    selected = next((recipe for recipe in ranked if recipe.cost_per_serving <= budget_left), ranked[0])
+    selected = (
+        ranked[0]
+        if policy and policy.strict_budget
+        else next((recipe for recipe in ranked if recipe.cost_per_serving <= budget_left), ranked[0])
+    )
     used_recipe_ids.add(selected.id)
     return selected
 
 
-def recipe_reasons(recipe: Recipe, idx: dict[str, PantryItem]) -> list[str]:
+def recipe_reasons(
+    recipe: Recipe, idx: dict[str, PantryItem], policy: PolicyConstraints | None = None
+) -> list[str]:
     missing = missing_ingredients(recipe, idx)
     available = [name for name in recipe.ingredients if normalize_name(name) in idx]
     reasons = []
@@ -140,6 +223,10 @@ def recipe_reasons(recipe: Recipe, idx: dict[str, PantryItem]) -> list[str]:
         reasons.append("быстро готовится")
     if recipe.nutrition.protein >= 20:
         reasons.append("поддерживает цель по белку")
+    if policy and policy.no_shop_mode and not missing:
+        reasons.append("matches no-shop mode")
+    if policy and policy.low_dishes and len(recipe.ingredients) <= 5:
+        reasons.append("fits low-dishes preference")
     return reasons or ["сбалансированное блюдо под текущие ограничения"]
 
 
@@ -226,6 +313,7 @@ def build_three_day_plan(
     strategy: PlanStrategy = "balanced",
 ) -> dict[str, Any]:
     idx = pantry_index(request.pantry)
+    policy = getattr(request, "policy", None)
     used_recipe_ids: set[int] = set()
     days = []
     selected_recipes: list[Recipe] = []
@@ -236,11 +324,11 @@ def build_three_day_plan(
         day_recipes = []
         budget_left = request.budget_per_day
         for meal in ("breakfast", "lunch", "dinner"):
-            recipe = pick_recipe(meal, idx, request.season, budget_left, used_recipe_ids, strategy)
+            recipe = pick_recipe(meal, idx, request.season, budget_left, used_recipe_ids, strategy, policy)
             day_meals[meal] = {
                 "label": MEAL_LABELS[meal],
                 "recipe": recipe.model_dump(),
-                "reasons": recipe_reasons(recipe, idx),
+                "reasons": recipe_reasons(recipe, idx, policy),
             }
             budget_left -= recipe.cost_per_serving
             day_recipes.append(recipe)
@@ -267,6 +355,8 @@ def build_three_day_plan(
         notes.append("План выходит за бюджет: замените одно дорогое блюдо на кашу, суп или овощной вариант.")
     if shopping_list:
         notes.append("Список покупок сформирован только по недостающим ингредиентам.")
+    if policy and policy.no_shop_mode and not shopping_list:
+        notes.append("No-shop mode applied: selected recipes do not require extra ingredients.")
 
     return {
         "days": days,
@@ -279,6 +369,14 @@ def build_three_day_plan(
             "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         },
         "notes": notes,
+        "policy": {
+            "allergies": policy.allergies if policy else [],
+            "disliked_ingredients": policy.disliked_ingredients if policy else [],
+            "max_cooking_time_min": policy.max_cooking_time_min if policy else None,
+            "no_shop_mode": policy.no_shop_mode if policy else False,
+            "low_dishes": policy.low_dishes if policy else False,
+            "strict_budget": policy.strict_budget if policy else False,
+        },
     }
 
 
@@ -319,6 +417,9 @@ def build_plan_options(request: PlanOptionsRequest) -> PlanOptionsResponse:
                 evidence={"approval_status": "draft"},
             ),
         ]
+        policy_item = policy_trace(request.policy)
+        if policy_item is not None:
+            trace.insert(1, policy_item)
         if request.context_note:
             trace.insert(
                 1,

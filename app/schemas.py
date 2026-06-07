@@ -96,8 +96,23 @@ class HealthResponse(BaseModel):
 PlanStrategy = Literal["simple", "waste_first", "balanced"]
 
 
+class PolicyConstraints(BaseModel):
+    allergies: list[str] = Field(default_factory=list, max_length=50)
+    disliked_ingredients: list[str] = Field(default_factory=list, max_length=100)
+    max_cooking_time_min: int | None = Field(default=None, ge=1, le=240)
+    no_shop_mode: bool = False
+    low_dishes: bool = False
+    strict_budget: bool = False
+
+    @field_validator("allergies", "disliked_ingredients")
+    @classmethod
+    def strip_list_values(cls, values: list[str]) -> list[str]:
+        return [value.strip() for value in values if value.strip()]
+
+
 class PlanOptionsRequest(ThreeDayPlanRequest):
     context_note: str | None = Field(default=None, max_length=1000)
+    policy: PolicyConstraints = Field(default_factory=PolicyConstraints)
 
 
 class DecisionTraceItem(BaseModel):

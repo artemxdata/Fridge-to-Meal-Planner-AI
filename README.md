@@ -22,6 +22,7 @@ a final shopping list.
 - Inspect a decision trace for every v3 plan option.
 - Approve or override a draft plan from the local demo UI and inspect persisted approval events.
 - Review the accepted plan and approve, skip, or change individual shopping-list items.
+- Apply visible policy constraints: allergies, disliked ingredients, no-shop mode, low-dishes mode, max cooking time, and strict budget.
 - Run without an LLM, external API, GPU, or model weights.
 
 ## Trust Model
@@ -96,6 +97,14 @@ curl -X POST http://127.0.0.1:8000/api/v3/plans/options \
   -d '{"pantry":[{"name":"яйца","quantity":6},{"name":"картофель","quantity":4}],"budget_per_day":520}'
 ```
 
+Generate options with explicit policy constraints:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v3/plans/options \
+  -H "Content-Type: application/json" \
+  -d '{"pantry":[{"name":"овсянка","quantity":2},{"name":"йогурт","quantity":2}],"budget_per_day":520,"days":1,"policy":{"allergies":["яйца"],"max_cooking_time_min":25,"low_dishes":true}}'
+```
+
 ## Development Checks
 
 ```powershell
@@ -129,7 +138,7 @@ SQLAlchemy models and v3 API.
 
 ## Current Limitations
 
-- The static frontend now demonstrates v3 option comparison, accepted plan state, and shopping-list item decisions.
+- The static frontend now demonstrates v3 option comparison, policy constraints, accepted plan state, and shopping-list item decisions.
 - The frontend is still a single static file, not a React PWA.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
@@ -138,7 +147,7 @@ SQLAlchemy models and v3 API.
 ## Roadmap
 
 1. Replace the static frontend with a bilingual React PWA and richer state management.
-2. Add policy-driven hard constraints and OR-Tools optimization.
+2. Add policy YAML, richer hard constraints, and OR-Tools optimization.
 3. Add barcode and receipt OCR before training custom computer vision.
 4. Build opt-in feedback datasets, ranking, and waste-risk models.
 5. Add authentication, household isolation, and production migrations.

@@ -54,6 +54,9 @@ Confirmed pantry + explicit preferences + proposed context
 
 The current scoring engine is a deterministic baseline. OR-Tools CP-SAT will replace it when recipe units,
 hard constraints, and pantry lots are modeled precisely.
+V3 plan options already apply visible policy constraints before ranking: allergies, disliked ingredients,
+no-shop mode, low-dishes preference, max cooking time, and strict budget. Applied constraints are included in
+the decision trace.
 
 ## Perception Flow
 
@@ -77,6 +80,7 @@ Implemented now:
 - demo household;
 - confirmed pantry lots;
 - latest accepted plan state after explicit plan approval;
+- deterministic policy constraints for v3 plan options;
 - append-only approval events for plan approval and override;
 - append-only approval events for item-level shopping decisions;
 - append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions.
@@ -104,6 +108,6 @@ authentication.
 
 - No production migrations for schema evolution yet.
 - No authentication or household isolation yet.
-- No policy YAML or hard allergy constraints yet.
+- No policy YAML or OR-Tools constraint solver yet.
 - No React PWA or offline state management yet.
 - No calibrated CV/OCR models or evaluation dataset.
