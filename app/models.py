@@ -33,6 +33,10 @@ class Household(Base):
         back_populates="household",
         cascade="all, delete-orphan",
     )
+    approval_events: Mapped[list[ApprovalEvent]] = relationship(
+        back_populates="household",
+        cascade="all, delete-orphan",
+    )
     audit_events: Mapped[list[AuditEvent]] = relationship(
         back_populates="household",
         cascade="all, delete-orphan",
@@ -72,3 +76,22 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
     household: Mapped[Household] = relationship(back_populates="audit_events")
+
+
+class ApprovalEvent(Base):
+    __tablename__ = "approval_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    actor: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    proposal_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    approved_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    override_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    household: Mapped[Household] = relationship(back_populates="approval_events")

@@ -37,8 +37,8 @@ The legacy `run_ultra_smart_app.py` remains a compatibility entrypoint only.
 - `/api/v2`: stable MVP compatibility routes used by the existing static demo.
 - `/api/v3`: human-controlled product contracts. Responses are drafts and include an approval boundary.
 
-V3 currently supports transparent context interpretation and explainable plan options. It intentionally does
-not expose a fake approval endpoint before persistence and audit history exist.
+V3 currently supports transparent context interpretation, explainable plan options, and durable plan
+approval/override events backed by persistence and audit history.
 
 ## Decision Flow
 
@@ -47,7 +47,7 @@ Confirmed pantry + explicit preferences + proposed context
     -> deterministic recipe scoring
     -> simple / waste-first / balanced draft plans
     -> decision trace and trade-offs
-    -> future ApprovalEvent
+    -> ApprovalEvent after explicit approval or override
 ```
 
 The current scoring engine is a deterministic baseline. OR-Tools CP-SAT will replace it when recipe units,
@@ -74,15 +74,16 @@ Implemented now:
 
 - demo household;
 - confirmed pantry lots;
-- append-only audit events for household creation and pantry confirmation.
+- append-only approval events for plan approval and override;
+- append-only audit events for household creation, pantry confirmation, and plan decisions.
 
 Still planned:
 
 - households and users;
 - purchase events;
 - observation sessions and candidates;
-- plans and shopping lists;
-- append-only approval, override, consent, and audit events.
+- durable accepted plans and shopping lists;
+- consent events.
 
 All records must be scoped by `household_id`. Cross-household access tests are mandatory before exposing
 authentication.
@@ -98,7 +99,7 @@ authentication.
 
 ## Known Gaps
 
-- No durable plan approval or override workflow yet.
+- No item-level shopping-list approval workflow yet.
 - No authentication or household isolation yet.
 - No policy YAML or hard allergy constraints yet.
 - No React PWA.

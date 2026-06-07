@@ -31,6 +31,7 @@ Observation -> Candidate facts -> Human confirmation -> Deterministic planning
 
 - Vision output is always a candidate and always has `needs_confirmation=true`.
 - V3 plans are always drafts and always have `requires_approval=true`.
+- Plan approval and override events are persisted before a draft becomes accepted state.
 - Context interpretation proposes structured constraints but requires confirmation.
 - Existing `/api/v2/*` contracts remain available while the product evolves through `/api/v3/*`.
 
@@ -114,6 +115,9 @@ The app now has a real persistence foundation:
 - `GET /api/v3/households/demo` creates a demo household and seeds confirmed pantry lots.
 - `GET /api/v3/households/{household_id}/pantry` returns confirmed pantry lots.
 - `POST /api/v3/households/{household_id}/pantry/confirm` records user-confirmed pantry items.
+- `POST /api/v3/households/{household_id}/plans/approve` records a human-approved plan option.
+- `POST /api/v3/households/{household_id}/plans/override` records a human override for a draft plan option.
+- `GET /api/v3/households/{household_id}/approval-events` returns append-only plan decision events.
 - `GET /api/v3/households/{household_id}/audit-events` returns append-only audit events.
 
 Local Python uses SQLite by default. Docker Compose uses PostgreSQL. Both paths use the same async
@@ -122,14 +126,14 @@ SQLAlchemy models and v3 API.
 ## Current Limitations
 
 - The static frontend demonstrates the v2 flow and does not yet expose v3 option comparison.
-- Pantry confirmations and audit events are persisted; plan approvals and overrides are not fully modeled yet.
+- Plan approvals and overrides are persisted, but shopping-list item approvals are not exposed in the UI yet.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Docker Compose is verified locally with the FastAPI app and PostgreSQL service.
 
 ## Roadmap
 
-1. Add first-class approval and override event types for plan and shopping-list decisions.
+1. Add item-level approval and override events for shopping-list decisions.
 2. Replace the static frontend with a bilingual React PWA.
 3. Add policy-driven hard constraints and OR-Tools optimization.
 4. Add barcode and receipt OCR before training custom computer vision.

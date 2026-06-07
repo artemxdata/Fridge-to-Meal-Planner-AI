@@ -170,3 +170,31 @@ class AuditEventResponse(BaseModel):
     reason: str
     payload: dict[str, Any]
     created_at: str
+
+
+class PlanApprovalRequest(BaseModel):
+    option: PlanOption
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(default="user_approved_plan_draft", min_length=1, max_length=500)
+
+
+class PlanOverrideRequest(BaseModel):
+    original_option: PlanOption
+    override_payload: dict[str, Any] = Field(default_factory=dict)
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class ApprovalEventResponse(BaseModel):
+    id: str
+    household_id: str
+    event_type: str
+    actor: str
+    target_type: str
+    target_id: str
+    status: str
+    reason: str
+    proposal_payload: dict[str, Any]
+    approved_payload: dict[str, Any]
+    override_payload: dict[str, Any]
+    created_at: str

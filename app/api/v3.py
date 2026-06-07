@@ -5,14 +5,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.schemas import (
+    ApprovalEventResponse,
     AuditEventResponse,
     ContextInterpretRequest,
     ContextInterpretResponse,
     HouseholdResponse,
     PantryConfirmationRequest,
     PantryLotResponse,
+    PlanApprovalRequest,
     PlanOptionsRequest,
     PlanOptionsResponse,
+    PlanOverrideRequest,
+)
+from app.services.approvals import (
+    approval_event_response,
+    approve_plan_option,
+    list_approval_events,
+    override_plan_option,
 )
 from app.services.context import interpret_context
 from app.services.households import (
@@ -39,6 +48,45 @@ def interpret_user_context(request: ContextInterpretRequest) -> ContextInterpret
 @router.post("/plans/options", response_model=PlanOptionsResponse)
 def plan_options(request: PlanOptionsRequest) -> PlanOptionsResponse:
     return build_plan_options(request)
+
+
+@router.get("/households/{household_id}/approval-events", response_model=list[ApprovalEventResponse])
+async def approval_events(
+    household_id: str, session: SessionDep, limit: int = 50
+) -> list[ApprovalEventResponse]:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    events = await list_approval_events(session, household_id, max(1, min(limit, 100)))
+    return [approval_event_response(event) for event in events]
+
+
+@router.post("/households/{household_id}/plans/approve", response_model=ApprovalEventResponse)
+async def approve_plan(
+    household_id: str,
+    request: PlanApprovalRequest,
+    session: SessionDep,
+) -> ApprovalEventResponse:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    event = await approve_plan_option(session, household_id=household_id, request=request)
+    return approval_event_response(event)
+
+
+@router.post("/households/{household_id}/plans/override", response_model=ApprovalEventResponse)
+async def override_plan(
+    household_id: str,
+    request: PlanOverrideRequest,
+    session: SessionDep,
+) -> ApprovalEventResponse:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    if not request.override_payload:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "override_payload is required")
+    event = await override_plan_option(session, household_id=household_id, request=request)
+    return approval_event_response(event)
 
 
 @router.get("/households/demo", response_model=HouseholdResponse)
