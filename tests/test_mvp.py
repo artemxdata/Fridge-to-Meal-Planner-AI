@@ -17,6 +17,8 @@ def test_root_and_frontend() -> None:
     assert root.json()["recipes"] > 0
     assert frontend.status_code == 200
     assert "Fridge-to-Meal Planner AI" in frontend.text
+    assert "/api/v3/plans/options" in frontend.text
+    assert "/api/v3/households/${householdId}/plans/approve" in frontend.text
 
 
 def test_demo_generates_three_day_plan_and_shopping_list() -> None:

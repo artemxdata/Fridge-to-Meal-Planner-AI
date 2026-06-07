@@ -6,62 +6,93 @@
   <title>Fridge-to-Meal Planner AI</title>
   <style>
     :root {
-      --bg: #f5f6f8;
-      --panel: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #d9dee7;
+      --bg: #f4f6f8;
+      --surface: #ffffff;
+      --surface-soft: #f9fafb;
+      --ink: #152033;
+      --muted: #657184;
+      --line: #d8dee8;
       --green: #147a5c;
-      --green-dark: #0f5e46;
+      --green-dark: #0e5e45;
       --blue: #2457c5;
+      --amber: #a15c07;
       --red: #b42318;
+      --shadow: 0 10px 28px rgba(16, 24, 40, 0.08);
     }
+
     * { box-sizing: border-box; }
+
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background: var(--bg);
       color: var(--ink);
     }
+
     header {
-      background: #ffffff;
-      border-bottom: 1px solid var(--line);
-      padding: 18px 24px;
       position: sticky;
       top: 0;
-      z-index: 2;
+      z-index: 3;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid var(--line);
+      padding: 16px 24px;
+      backdrop-filter: blur(10px);
     }
-    h1 { margin: 0; font-size: 24px; }
-    h2 { margin: 0 0 12px; font-size: 18px; }
-    .sub { margin-top: 6px; color: var(--muted); max-width: 920px; line-height: 1.45; }
+
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 4px; font-size: 24px; }
+    h2 { margin-bottom: 12px; font-size: 18px; }
+    h3 { margin-bottom: 8px; font-size: 16px; }
+
+    .sub {
+      max-width: 1080px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
     main {
-      max-width: 1280px;
+      max-width: 1440px;
       margin: 0 auto;
-      padding: 22px;
+      padding: 20px;
       display: grid;
-      grid-template-columns: 380px 1fr;
+      grid-template-columns: 390px 1fr;
       gap: 18px;
     }
+
     section, aside {
-      background: var(--panel);
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 16px;
     }
+
     .stack { display: grid; gap: 14px; }
     .grid { display: grid; gap: 10px; }
     .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
-    input, select {
+    .options { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); align-items: start; }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    input, select, textarea {
       width: 100%;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 10px 11px;
-      font-size: 14px;
       background: #fff;
       color: var(--ink);
+      font: inherit;
+      font-size: 14px;
     }
+
+    textarea { min-height: 78px; resize: vertical; }
+
     button {
+      min-height: 40px;
       border: 0;
       border-radius: 8px;
       padding: 10px 12px;
@@ -70,179 +101,299 @@
       font-weight: 700;
       cursor: pointer;
     }
+
     button:hover { background: var(--green-dark); }
     button.secondary { background: var(--blue); }
-    button.danger { background: var(--red); }
     button.light { background: #edf2f7; color: var(--ink); }
+    button.warn { background: var(--amber); }
+    button.danger { background: var(--red); }
+    button:disabled { cursor: not-allowed; opacity: 0.58; }
+
+    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+    .status { min-height: 22px; color: var(--muted); font-size: 14px; line-height: 1.45; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--surface-soft);
+    }
+
+    .metric b { display: block; font-size: 18px; }
+
     .row {
       display: grid;
-      grid-template-columns: 1.4fr .6fr .6fr .7fr 44px;
+      grid-template-columns: 1.35fr 0.62fr 0.55fr 0.7fr 42px;
       gap: 8px;
       align-items: center;
       margin-bottom: 8px;
     }
+
     .candidate {
       display: grid;
-      grid-template-columns: 28px 1fr .65fr .65fr .8fr;
+      grid-template-columns: 26px 1fr 0.62fr 0.55fr;
       gap: 8px;
       align-items: center;
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 8px;
+      background: var(--surface-soft);
       margin-bottom: 8px;
-      background: #fafbfc;
     }
+
     .pill {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
       padding: 4px 8px;
       border-radius: 999px;
       background: #eef4ff;
       color: #1d4ed8;
       font-size: 12px;
-      margin: 2px;
+      margin: 2px 4px 2px 0;
     }
-    .muted { color: var(--muted); }
-    .card {
+
+    .pill.green { background: #eaf7f1; color: var(--green); }
+    .pill.amber { background: #fff4e5; color: var(--amber); }
+
+    .option-card {
       border: 1px solid var(--line);
       border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 10px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .option-head {
+      padding: 14px;
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-soft);
+    }
+
+    .option-body { padding: 14px; }
+
+    .day {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--green);
+      border-radius: 8px;
+      padding: 10px;
+      margin: 10px 0;
       background: #fff;
     }
-    .day {
-      border-left: 4px solid var(--green);
+
+    .meal {
+      padding: 8px 0;
+      border-top: 1px solid #edf0f4;
     }
+
+    .meal:first-of-type { border-top: 0; }
+
     .meal-title {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
       font-weight: 700;
     }
-    .shopping {
+
+    .shopping-item {
       display: grid;
-      grid-template-columns: 120px 1fr 90px;
+      grid-template-columns: 1fr 88px;
       gap: 8px;
       padding: 8px 0;
       border-bottom: 1px solid #edf0f4;
     }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
-    .status {
-      min-height: 22px;
-      color: var(--muted);
-      font-size: 14px;
+
+    .events {
+      display: grid;
+      gap: 8px;
+      max-height: 280px;
+      overflow: auto;
     }
-    @media (max-width: 900px) {
+
+    .event {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      background: var(--surface-soft);
+    }
+
+    @media (max-width: 1100px) {
       main { grid-template-columns: 1fr; }
-      .row { grid-template-columns: 1fr 80px 70px 90px 44px; }
-      .candidate { grid-template-columns: 28px 1fr; }
-      .cols { grid-template-columns: 1fr; }
+      .options { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      main { padding: 12px; }
+      header { padding: 14px; }
+      .row { grid-template-columns: minmax(0, 1fr) 74px 42px; }
+      .row input:first-child { grid-column: 1 / -1; }
+      .row input:nth-child(4) { grid-column: 1 / 3; }
+      .row button { grid-column: 3; grid-row: 2 / 4; min-height: 86px; }
+      .candidate { grid-template-columns: 26px 1fr; }
+      .cols, .metric-row { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <header>
     <h1>Fridge-to-Meal Planner AI</h1>
-    <div class="sub">MVP: загрузите фото или включите demo, подтвердите ингредиенты, задайте бюджет и цели, получите план питания на 3 дня, список покупок и объяснение выбора.</div>
+    <div class="sub">Human-controlled demo: AI предлагает кандидаты, ограничения и варианты плана, но факты, правки и финальное решение подтверждает пользователь.</div>
   </header>
 
   <main>
     <aside class="stack">
       <section class="stack">
-        <h2>1. Фото и распознавание</h2>
+        <h2>Workspace</h2>
         <label>API URL
           <input id="baseUrl" value="http://127.0.0.1:8000" />
         </label>
-        <label>Фото холодильника или продуктов
+        <div class="toolbar">
+          <button onclick="loadDemo()">Demo</button>
+          <button class="light" onclick="loadHousehold()">Household</button>
+        </div>
+        <div id="workspaceStatus" class="status"></div>
+      </section>
+
+      <section class="stack">
+        <h2>Photo Candidates</h2>
+        <label>Фото продуктов
           <input id="photoInput" type="file" accept="image/*" />
         </label>
-        <label>Текстовая подсказка для fallback/OCR mock
-          <input id="textHint" placeholder="например: яйца, йогурт, курица, картофель" />
+        <label>Text hint
+          <input id="textHint" placeholder="яйца, йогурт, курица, картофель" />
         </label>
         <div class="toolbar">
-          <button onclick="analyzePhoto()">Распознать фото</button>
-          <button class="secondary" onclick="loadDemo()">Demo сценарий</button>
+          <button onclick="analyzePhoto()">Analyze</button>
+          <button class="light" onclick="confirmCandidates()">Confirm checked</button>
         </div>
         <div id="visionStatus" class="status"></div>
         <div id="candidates"></div>
-        <button class="light" onclick="confirmCandidates()">Добавить отмеченные в холодильник</button>
       </section>
 
-      <section>
-        <h2>2. Подтвержденный холодильник</h2>
+      <section class="stack">
+        <h2>Confirmed Pantry</h2>
         <div id="pantryRows"></div>
         <div class="toolbar">
-          <button class="light" onclick="addItem()">Добавить вручную</button>
-          <button class="danger" onclick="clearPantry()">Очистить</button>
+          <button class="light" onclick="addItem()">Add item</button>
+          <button class="secondary" onclick="persistPantry()">Save to v3</button>
+          <button class="danger" onclick="clearPantry()">Clear</button>
         </div>
       </section>
 
       <section class="stack">
-        <h2>3. Цели и ограничения</h2>
+        <h2>Context</h2>
+        <textarea id="contextNote">Я устал, хочу что-то теплое без магазина и с минимумом посуды</textarea>
+        <button class="light" onclick="interpretContext()">Interpret context</button>
+        <div id="contextResult" class="status"></div>
+      </section>
+
+      <section class="stack">
+        <h2>Targets</h2>
         <div class="grid cols">
-          <label>Бюджет в день, руб.
+          <label>Budget/day
             <input id="budget" type="number" value="520" min="100" />
           </label>
-          <label>Сезон
+          <label>Season
             <select id="season">
-              <option value="">Любой</option>
-              <option value="spring">Весна</option>
-              <option value="summer">Лето</option>
-              <option value="autumn">Осень</option>
-              <option value="winter">Зима</option>
+              <option value="">Any</option>
+              <option value="spring">Spring</option>
+              <option value="summer">Summer</option>
+              <option value="autumn">Autumn</option>
+              <option value="winter">Winter</option>
             </select>
           </label>
-          <label>Калории в день
+          <label>Calories/day
             <input id="calories" type="number" value="1800" />
           </label>
-          <label>Белок в день, г
+          <label>Protein/day, g
             <input id="protein" type="number" value="95" />
           </label>
         </div>
-        <button onclick="generateThreeDayPlan()">Сгенерировать план на 3 дня</button>
+        <button onclick="generatePlanOptions()">Generate v3 options</button>
       </section>
     </aside>
 
     <section class="stack">
       <section>
-        <h2>План питания на 3 дня</h2>
-        <div id="summary" class="status"></div>
-        <div id="plan"></div>
+        <h2>Plan Options</h2>
+        <div class="metric-row">
+          <div class="metric"><span class="small muted">Household</span><b id="householdMetric">-</b></div>
+          <div class="metric"><span class="small muted">Pantry items</span><b id="pantryMetric">0</b></div>
+          <div class="metric"><span class="small muted">Draft options</span><b id="optionsMetric">0</b></div>
+          <div class="metric"><span class="small muted">Last decision</span><b id="decisionMetric">-</b></div>
+        </div>
+        <div id="planStatus" class="status"></div>
+        <div id="options" class="grid options"></div>
       </section>
 
       <section>
-        <h2>Список покупок и зачем это нужно</h2>
-        <div id="shopping"></div>
-      </section>
-
-      <section>
-        <h2>Статистика</h2>
-        <div id="stats" class="status"></div>
-        <ul id="notes"></ul>
+        <h2>Approval Events</h2>
+        <div class="toolbar">
+          <button class="light" onclick="loadApprovalEvents()">Refresh</button>
+        </div>
+        <div id="events" class="events"></div>
       </section>
     </section>
   </main>
 
   <script>
+    let householdId = "";
     let pantry = [];
     let candidates = [];
+    let planOptions = [];
+    let lastDecision = null;
 
     const el = (id) => document.getElementById(id);
-    const apiBase = () => el("baseUrl").value.trim() || "http://127.0.0.1:8000";
+    const apiBase = () => el("baseUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:8000";
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function api(path, options = {}) {
+      const res = await fetch(`${apiBase()}${path}`, options);
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!res.ok) {
+        throw new Error(data?.detail || `HTTP ${res.status}`);
+      }
+      return data;
+    }
 
     function savePantry() {
-      localStorage.setItem("ftm_pantry", JSON.stringify(pantry));
+      localStorage.setItem("ftm_pantry_v3", JSON.stringify(pantry));
     }
 
     function loadPantry() {
       try {
-        pantry = JSON.parse(localStorage.getItem("ftm_pantry") || "[]");
+        pantry = JSON.parse(localStorage.getItem("ftm_pantry_v3") || "[]");
       } catch {
         pantry = [];
       }
     }
 
+    function updateMetrics() {
+      el("householdMetric").textContent = householdId || "-";
+      el("pantryMetric").textContent = pantry.length;
+      el("optionsMetric").textContent = planOptions.length;
+      el("decisionMetric").textContent = lastDecision?.status || "-";
+    }
+
     function addItem(item) {
-      pantry.push(item || { name: "", quantity: 1, unit: "шт", expires_in_days: 7, source: "manual", confidence: null });
+      pantry.push(item || { name: "", quantity: 1, unit: "шт", expires_in_days: 7, source: "manual", confidence: 1 });
       savePantry();
       renderPantry();
     }
@@ -263,39 +414,43 @@
       const box = el("pantryRows");
       box.innerHTML = "";
       if (!pantry.length) {
-        box.innerHTML = '<div class="muted">Пока нет подтвержденных продуктов.</div>';
+        box.innerHTML = '<div class="muted">Нет подтверждённых продуктов.</div>';
+        updateMetrics();
         return;
       }
+
       pantry.forEach((item, index) => {
         const row = document.createElement("div");
         row.className = "row";
         row.innerHTML = `
-          <input value="${item.name || ""}" placeholder="продукт" oninput="pantry[${index}].name=this.value; savePantry()" />
+          <input value="${escapeHtml(item.name)}" placeholder="продукт" oninput="pantry[${index}].name=this.value; savePantry()" />
           <input type="number" step="0.1" value="${item.quantity || 1}" oninput="pantry[${index}].quantity=Number(this.value||1); savePantry()" />
-          <input value="${item.unit || "шт"}" oninput="pantry[${index}].unit=this.value; savePantry()" />
-          <input type="number" value="${item.expires_in_days ?? ""}" placeholder="дни" oninput="pantry[${index}].expires_in_days=Number(this.value||0); savePantry()" />
+          <input value="${escapeHtml(item.unit || "шт")}" oninput="pantry[${index}].unit=this.value; savePantry()" />
+          <input type="number" value="${item.expires_in_days ?? ""}" placeholder="дни" oninput="pantry[${index}].expires_in_days=this.value===''?null:Number(this.value); savePantry()" />
           <button class="danger" onclick="removeItem(${index})">X</button>
         `;
         box.appendChild(row);
       });
+      updateMetrics();
     }
 
     function renderCandidates() {
       const box = el("candidates");
       box.innerHTML = "";
       if (!candidates.length) {
-        box.innerHTML = '<div class="muted">Нет кандидатов. Используйте demo или введите продукты вручную.</div>';
+        box.innerHTML = '<div class="muted">Кандидатов пока нет.</div>';
         return;
       }
+
       candidates.forEach((item, index) => {
         const row = document.createElement("div");
         row.className = "candidate";
         row.innerHTML = `
           <input type="checkbox" checked id="cand-${index}" />
-          <input value="${item.name}" oninput="candidates[${index}].name=this.value" />
+          <input value="${escapeHtml(item.name)}" oninput="candidates[${index}].name=this.value" />
           <input type="number" step="0.1" value="${item.quantity || 1}" oninput="candidates[${index}].quantity=Number(this.value||1)" />
-          <input value="${item.unit || "шт"}" oninput="candidates[${index}].unit=this.value" />
-          <div class="muted">${Math.round((item.confidence || 0) * 100)}% · ${item.reason || item.source}</div>
+          <input value="${escapeHtml(item.unit || "шт")}" oninput="candidates[${index}].unit=this.value" />
+          <div class="small muted">${Math.round((item.confidence || 0) * 100)}% · ${escapeHtml(item.source || "candidate")}</div>
         `;
         box.appendChild(row);
       });
@@ -303,50 +458,108 @@
 
     function confirmCandidates() {
       candidates.forEach((item, index) => {
-        const checked = el(`cand-${index}`)?.checked;
-        if (checked) addItem({ ...item, source: item.source || "vision" });
+        if (el(`cand-${index}`)?.checked) {
+          addItem({ ...item, source: item.source || "vision_candidate" });
+        }
       });
       candidates = [];
       renderCandidates();
-      el("visionStatus").textContent = "Ингредиенты добавлены. Их можно отредактировать вручную перед генерацией плана.";
+      el("visionStatus").textContent = "Кандидаты перенесены в confirmed pantry.";
     }
 
     async function analyzePhoto() {
       const file = el("photoInput").files[0];
       if (!file) {
-        el("visionStatus").textContent = "Выберите фото или нажмите Demo сценарий.";
+        el("visionStatus").textContent = "Выберите фото или загрузите demo.";
         return;
       }
+
       const form = new FormData();
       form.append("file", file);
       form.append("mode", "auto");
       form.append("text_hint", el("textHint").value || "");
-      el("visionStatus").textContent = "Анализирую фото...";
-      const res = await fetch(`${apiBase()}/api/v2/vision/analyze`, { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) {
-        el("visionStatus").textContent = data.detail || "Ошибка анализа фото";
-        return;
+
+      try {
+        el("visionStatus").textContent = "Analyzing...";
+        const data = await api("/api/v2/vision/analyze", { method: "POST", body: form });
+        candidates = data.items || [];
+        el("visionStatus").textContent = `Candidates: ${candidates.length}. needs_confirmation=${data.needs_confirmation}.`;
+        renderCandidates();
+      } catch (err) {
+        el("visionStatus").textContent = err.message;
       }
-      candidates = data.items || [];
-      el("visionStatus").textContent = `Найдено кандидатов: ${candidates.length}. Fallback: ${data.fallback}. Подтвердите список вручную.`;
-      renderCandidates();
+    }
+
+    async function loadHousehold() {
+      try {
+        const household = await api("/api/v3/households/demo");
+        householdId = household.id;
+        el("workspaceStatus").textContent = `Household: ${household.name}`;
+        updateMetrics();
+        await loadApprovalEvents();
+      } catch (err) {
+        el("workspaceStatus").textContent = err.message;
+      }
     }
 
     async function loadDemo() {
-      const res = await fetch(`${apiBase()}/api/v2/demo`);
-      const data = await res.json();
-      pantry = data.pantry || [];
-      el("budget").value = data.preferences?.budget_per_day || 520;
-      el("season").value = data.preferences?.season || "";
-      el("calories").value = data.preferences?.target_calories || 1800;
-      el("protein").value = data.preferences?.protein_goal_g || 95;
-      savePantry();
-      renderPantry();
-      el("visionStatus").textContent = data.scenario || "Demo загружен.";
+      try {
+        const demo = await api("/api/v2/demo");
+        pantry = demo.pantry || [];
+        el("budget").value = demo.preferences?.budget_per_day || 520;
+        el("season").value = demo.preferences?.season || "";
+        el("calories").value = demo.preferences?.target_calories || 1800;
+        el("protein").value = demo.preferences?.protein_goal_g || 95;
+        savePantry();
+        renderPantry();
+        await loadHousehold();
+        el("workspaceStatus").textContent = demo.scenario || "Demo loaded.";
+      } catch (err) {
+        el("workspaceStatus").textContent = err.message;
+      }
     }
 
-    async function generateThreeDayPlan() {
+    async function persistPantry() {
+      if (!householdId) {
+        await loadHousehold();
+      }
+      if (!pantry.length) {
+        el("workspaceStatus").textContent = "Pantry is empty.";
+        return;
+      }
+      try {
+        await api(`/api/v3/households/${householdId}/pantry/confirm`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actor: "demo-user",
+            reason: "user_confirmed_frontend_pantry",
+            items: pantry,
+          }),
+        });
+        el("workspaceStatus").textContent = "Pantry confirmation saved to v3.";
+      } catch (err) {
+        el("workspaceStatus").textContent = err.message;
+      }
+    }
+
+    async function interpretContext() {
+      try {
+        const data = await api("/api/v3/assistant/interpret-context", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: el("contextNote").value }),
+        });
+        const constraints = Object.entries(data.proposed_constraints || {})
+          .map(([key, value]) => `<span class="pill amber">${escapeHtml(key)}=${escapeHtml(value)}</span>`)
+          .join("");
+        el("contextResult").innerHTML = `${constraints}<div>${(data.evidence || []).map(escapeHtml).join("<br>")}</div>`;
+      } catch (err) {
+        el("contextResult").textContent = err.message;
+      }
+    }
+
+    async function generatePlanOptions() {
       const payload = {
         pantry,
         budget_per_day: Number(el("budget").value || 520),
@@ -354,74 +567,193 @@
         target_calories: Number(el("calories").value || 1800),
         protein_goal_g: Number(el("protein").value || 95),
         meal_preference: "day",
-        days: 3
+        days: 3,
+        context_note: el("contextNote").value || null,
       };
-      const res = await fetch(`${apiBase()}/api/v2/meal-plan/3-days`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        el("summary").textContent = data.detail || "Ошибка генерации плана";
-        return;
+
+      try {
+        el("planStatus").textContent = "Generating draft options...";
+        const data = await api("/api/v3/plans/options", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        planOptions = data.options || [];
+        el("planStatus").textContent = data.assistant_boundary;
+        renderOptions();
+        updateMetrics();
+      } catch (err) {
+        el("planStatus").textContent = err.message;
       }
-      renderPlan(data);
     }
 
-    function renderPlan(data) {
-      el("summary").innerHTML = `
-        Итого: <b>${data.totals.calories}</b> ккал, <b>${data.totals.protein_g}</b> г белка,
-        стоимость <b>${data.totals.cost}</b> руб. из лимита <b>${data.totals.budget_limit}</b> руб.
-      `;
+    function optionMetrics(option) {
+      const totals = option.plan?.totals || {};
+      return [
+        `${totals.calories || 0} kcal`,
+        `${totals.protein_g || 0}g protein`,
+        `${totals.cost || 0} rub`,
+        `${option.plan?.statistics?.pantry_usage_percent || 0}% pantry`,
+      ];
+    }
 
-      const plan = el("plan");
-      plan.innerHTML = "";
-      data.days.forEach((day) => {
-        const wrap = document.createElement("div");
-        wrap.className = "card day";
-        let html = `<h3>${day.title}</h3>`;
-        Object.values(day.meals).forEach((meal) => {
-          const recipe = meal.recipe;
-          html += `
-            <div class="card">
-              <div class="meal-title">
-                <span>${meal.label}: ${recipe.title}</span>
-                <span>${recipe.time_min} мин · ${recipe.cost_per_serving} руб.</span>
-              </div>
-              <div>${Object.keys(recipe.ingredients).map((x) => `<span class="pill">${x}</span>`).join("")}</div>
-              <div class="muted">КБЖУ: ${recipe.nutrition.calories} ккал · Б ${recipe.nutrition.protein} · У ${recipe.nutrition.carbs} · Ж ${recipe.nutrition.fats}</div>
-              <ul>${(meal.reasons || []).map((reason) => `<li>${reason}</li>`).join("")}</ul>
-            </div>
-          `;
-        });
-        html += `<div class="muted">День: ${day.totals.calories} ккал, белок ${day.totals.protein_g} г, стоимость ${day.totals.cost} руб.</div>`;
-        wrap.innerHTML = html;
-        plan.appendChild(wrap);
-      });
-
-      const shopping = el("shopping");
-      shopping.innerHTML = "";
-      if (!data.shopping_list.length) {
-        shopping.innerHTML = '<div class="muted">Покупки не нужны: продукты уже есть дома.</div>';
-      } else {
-        data.shopping_list.forEach((item) => {
-          const row = document.createElement("div");
-          row.className = "shopping";
-          row.innerHTML = `
-            <b>${item.category}</b>
-            <div>${item.name}<div class="muted">${item.reason}</div></div>
-            <span>${item.missing_quantity} ${item.unit}</span>
-          `;
-          shopping.appendChild(row);
-        });
+    function renderOptions() {
+      const box = el("options");
+      box.innerHTML = "";
+      if (!planOptions.length) {
+        box.innerHTML = '<div class="muted">Draft options are not generated yet.</div>';
+        return;
       }
 
-      el("stats").innerHTML = `
-        Использовано продуктов из холодильника: <b>${data.statistics.pantry_usage_percent}%</b>.
-        Рецептов в плане: <b>${data.statistics.recipes_count}</b>.
-      `;
-      el("notes").innerHTML = (data.notes || []).map((note) => `<li>${note}</li>`).join("");
+      planOptions.forEach((option, index) => {
+        const card = document.createElement("div");
+        card.className = "option-card";
+        const metrics = optionMetrics(option).map((text) => `<span class="pill green">${escapeHtml(text)}</span>`).join("");
+        const trace = (option.decision_trace || [])
+          .map((item) => `<li><b>${escapeHtml(item.rule)}</b>: ${escapeHtml(item.reason)}</li>`)
+          .join("");
+        const days = (option.plan?.days || []).map(renderDay).join("");
+        const shopping = renderShopping(option.plan?.shopping_list || []);
+        card.innerHTML = `
+          <div class="option-head">
+            <span class="pill">${escapeHtml(option.strategy)}</span>
+            <h3>${escapeHtml(option.title)}</h3>
+            <div class="muted">${escapeHtml(option.summary)}</div>
+            <div>${metrics}</div>
+          </div>
+          <div class="option-body">
+            <div class="toolbar">
+              <button onclick="approveOption(${index})">Approve</button>
+              <button class="warn" onclick="overrideOption(${index})">Override</button>
+            </div>
+            <h3>Decision trace</h3>
+            <ul>${trace}</ul>
+            <h3>Meals</h3>
+            ${days}
+            <h3>Shopping list</h3>
+            ${shopping}
+          </div>
+        `;
+        box.appendChild(card);
+      });
+    }
+
+    function renderDay(day) {
+      const meals = Object.values(day.meals || {})
+        .map((meal) => {
+          const recipe = meal.recipe || {};
+          const ingredients = Object.keys(recipe.ingredients || {})
+            .map((name) => `<span class="pill">${escapeHtml(name)}</span>`)
+            .join("");
+          return `
+            <div class="meal">
+              <div class="meal-title">
+                <span>${escapeHtml(meal.label)}: ${escapeHtml(recipe.title)}</span>
+                <span>${recipe.time_min || 0} min</span>
+              </div>
+              <div>${ingredients}</div>
+              <div class="small muted">${(meal.reasons || []).map(escapeHtml).join(" · ")}</div>
+            </div>
+          `;
+        })
+        .join("");
+      return `<div class="day"><b>${escapeHtml(day.title)}</b>${meals}</div>`;
+    }
+
+    function renderShopping(items) {
+      if (!items.length) {
+        return '<div class="muted">No missing ingredients.</div>';
+      }
+      return items.map((item) => `
+        <div class="shopping-item">
+          <div>
+            <b>${escapeHtml(item.name)}</b>
+            <div class="small muted">${escapeHtml(item.reason)}</div>
+          </div>
+          <div>${escapeHtml(item.missing_quantity)} ${escapeHtml(item.unit)}</div>
+        </div>
+      `).join("");
+    }
+
+    async function approveOption(index) {
+      if (!householdId) {
+        await loadHousehold();
+      }
+      try {
+        const event = await api(`/api/v3/households/${householdId}/plans/approve`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actor: "demo-user",
+            reason: "user_approved_frontend_plan",
+            option: planOptions[index],
+          }),
+        });
+        lastDecision = event;
+        el("planStatus").textContent = `Approved: ${event.target_id}`;
+        updateMetrics();
+        await loadApprovalEvents();
+      } catch (err) {
+        el("planStatus").textContent = err.message;
+      }
+    }
+
+    async function overrideOption(index) {
+      if (!householdId) {
+        await loadHousehold();
+      }
+      const reason = prompt("Reason for override", "replace dinner with a faster meal");
+      if (!reason) return;
+      const replacement = prompt("Replacement note", "faster protein meal");
+      if (!replacement) return;
+
+      try {
+        const event = await api(`/api/v3/households/${householdId}/plans/override`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            actor: "demo-user",
+            reason,
+            original_option: planOptions[index],
+            override_payload: {
+              replacement,
+              source: "frontend_demo",
+            },
+          }),
+        });
+        lastDecision = event;
+        el("planStatus").textContent = `Overridden: ${event.target_id}`;
+        updateMetrics();
+        await loadApprovalEvents();
+      } catch (err) {
+        el("planStatus").textContent = err.message;
+      }
+    }
+
+    async function loadApprovalEvents() {
+      if (!householdId) return;
+      try {
+        const events = await api(`/api/v3/households/${householdId}/approval-events`);
+        const box = el("events");
+        box.innerHTML = "";
+        if (!events.length) {
+          box.innerHTML = '<div class="muted">No plan decisions yet.</div>';
+          return;
+        }
+        events.forEach((event) => {
+          const node = document.createElement("div");
+          node.className = "event";
+          node.innerHTML = `
+            <b>${escapeHtml(event.event_type)}</b>
+            <span class="pill ${event.status === "approved" ? "green" : "amber"}">${escapeHtml(event.status)}</span>
+            <div class="small muted">${escapeHtml(event.target_id)} · ${escapeHtml(event.actor)} · ${escapeHtml(event.created_at)}</div>
+            <div>${escapeHtml(event.reason)}</div>
+          `;
+          box.appendChild(node);
+        });
+      } catch (err) {
+        el("events").textContent = err.message;
+      }
     }
 
     loadPantry();
@@ -429,12 +761,13 @@
       pantry = [
         { name: "яйца", quantity: 4, unit: "шт", expires_in_days: 5, source: "sample", confidence: 1 },
         { name: "йогурт", quantity: 2, unit: "шт", expires_in_days: 3, source: "sample", confidence: 1 },
-        { name: "картофель", quantity: 3, unit: "шт", expires_in_days: 12, source: "sample", confidence: 1 }
+        { name: "картофель", quantity: 3, unit: "шт", expires_in_days: 12, source: "sample", confidence: 1 },
       ];
       savePantry();
     }
     renderPantry();
     renderCandidates();
+    loadHousehold();
   </script>
 </body>
 </html>
