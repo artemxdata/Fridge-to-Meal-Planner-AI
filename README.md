@@ -107,16 +107,17 @@ docker compose up --build
 ```
 
 Docker Compose starts the FastAPI app on `:8000` and a local PostgreSQL 16 database for v3 pantry/audit
-persistence. The Docker image builds the React PWA in a Node stage and serves the compiled app at `/pwa`.
+persistence. The app container runs `alembic upgrade head` before starting FastAPI, disables automatic table
+creation, builds the React PWA in a Node stage, and serves the compiled app at `/pwa`.
 
-Production schema migrations:
+Manual production schema migrations:
 
 ```bash
 AUTO_CREATE_TABLES=false alembic upgrade head
 ```
 
-Local development keeps `AUTO_CREATE_TABLES=true` by default for fast demos. Production deployments should run
-Alembic migrations explicitly before starting the app with automatic table creation disabled.
+Local Python development keeps `AUTO_CREATE_TABLES=true` by default for fast demos. Docker Compose and
+production-like deployments use Alembic migrations with automatic table creation disabled.
 
 ## API Examples
 
@@ -179,7 +180,8 @@ Dependencies are separated by purpose:
 - `requirements-vision.txt` - optional experimental YOLO/OpenCV stack.
 - Receipt/barcode parsing uses deterministic heuristics in the core runtime and does not require OCR libraries.
 
-GitHub Actions runs the same backend lint/test checks, frontend test/build checks, and Docker image build.
+GitHub Actions runs the same backend lint/test checks, frontend test/build checks, Docker contract tests, and
+Docker image build.
 
 ## Persistence
 
@@ -213,8 +215,8 @@ current v3 persistence schema.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Receipt/barcode parsing is demo-grade and still requires user confirmation.
-- Docker Compose is verified locally with the FastAPI app and PostgreSQL service.
-- Production migrations are available through Alembic, but there is not yet a full deployment runbook.
+- Docker Compose is wired to run Alembic migrations before FastAPI startup.
+- Production migrations are available through Alembic, but there is not yet a full backup/restore runbook.
 
 ## Roadmap
 

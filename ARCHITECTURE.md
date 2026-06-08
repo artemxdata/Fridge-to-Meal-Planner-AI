@@ -94,7 +94,8 @@ pantry facts is auditable.
 
 The current persistence increment uses async SQLAlchemy with SQLite fallback and PostgreSQL in Docker Compose.
 Alembic migrations under `migrations/` are the production schema path; local development can still use
-`AUTO_CREATE_TABLES=true` for quick demos.
+`AUTO_CREATE_TABLES=true` for quick demos. Docker Compose runs migrations before app startup and sets
+`AUTO_CREATE_TABLES=false`.
 
 Implemented now:
 
@@ -125,6 +126,7 @@ authentication.
 - Requests receive an `X-Request-ID`.
 - Health endpoints separate liveness from readiness.
 - Optional CV dependencies are excluded from the core runtime.
+- The Docker entrypoint can run Alembic migrations before serving traffic.
 - External LLM/VLM integrations must use timeouts, structured outputs, model versions, and graceful fallback.
 
 ## Known Gaps

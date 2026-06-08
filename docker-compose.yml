@@ -24,7 +24,8 @@ services:
       APP_ENV: development
       CORS_ORIGINS: http://127.0.0.1:8000,http://localhost:8000,http://127.0.0.1:5173,http://localhost:5173
       DATABASE_URL: postgresql+asyncpg://fridge:fridge_dev_password@db:5432/fridge
-      AUTO_CREATE_TABLES: "true"
+      AUTO_CREATE_TABLES: "false"
+      RUN_MIGRATIONS: "true"
     healthcheck:
       test:
         [

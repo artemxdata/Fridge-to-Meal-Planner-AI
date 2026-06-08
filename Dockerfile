@@ -25,14 +25,19 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+COPY alembic.ini ./alembic.ini
+COPY migrations ./migrations
 COPY app ./app
 COPY data ./data
+COPY docker/entrypoint.sh ./docker/entrypoint.sh
 COPY index.html run_ultra_smart_app.py ./
 COPY --from=frontend-build /frontend/dist ./frontend/dist
 
-RUN chown -R app:app /app
+RUN chmod +x /app/docker/entrypoint.sh \
+    && chown -R app:app /app
 USER app
 
 EXPOSE 8000
 
+ENTRYPOINT ["/app/docker/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
