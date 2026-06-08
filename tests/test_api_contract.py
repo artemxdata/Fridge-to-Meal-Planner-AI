@@ -92,3 +92,20 @@ def test_receipt_and_barcode_parser_returns_confirmable_candidates() -> None:
     assert data["needs_confirmation"] is True
     assert data["fallback"] == "receipt_barcode_heuristics"
     assert any("Unknown barcodes" in note for note in data["notes"])
+
+
+def test_receipt_parser_supports_english_demo_aliases() -> None:
+    response = client.post(
+        "/api/v2/perception/parse",
+        json={
+            "source": "receipt",
+            "raw_text": "yogurt 2 pcs\npotato 3 kg\neggs 10 pcs",
+            "barcodes": [],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    names = {item["name"] for item in data["items"]}
+    assert {"йогурт", "картофель", "яйца"} <= names
+    assert all("matched product alias" in item["reason"] for item in data["items"])

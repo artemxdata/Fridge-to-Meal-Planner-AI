@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from app.catalog import PRODUCT_CATEGORIES, normalize_name
+from app.catalog import PRODUCT_ALIASES, PRODUCT_CATEGORIES, normalize_name
 from app.schemas import DetectedIngredient, PerceptionParseRequest, PerceptionParseResponse
 
 BARCODE_CATALOG: dict[str, tuple[str, float]] = {
@@ -31,6 +31,33 @@ EXTRA_PRODUCTS = {
     "чеснок",
 }
 KNOWN_PRODUCTS = sorted(set(PRODUCT_CATEGORIES) | EXTRA_PRODUCTS, key=len, reverse=True)
+EXTRA_TEXT_ALIASES = {
+    "banana": "банан",
+    "bananas": "банан",
+    "beans": "фасоль",
+    "bread": "хлеб",
+    "cream": "сливки",
+    "garlic": "чеснок",
+    "granola": "гранола",
+    "mince": "фарш",
+    "minced meat": "фарш",
+    "olives": "маслины",
+    "pork": "свинина",
+    "raisins": "изюм",
+    "sausage": "колбаса",
+}
+TEXT_PRODUCT_ALIASES = sorted(
+    {
+        **{product: product for product in KNOWN_PRODUCTS},
+        **{
+            alias: canonical
+            for alias, canonical in (PRODUCT_ALIASES | EXTRA_TEXT_ALIASES).items()
+            if canonical in KNOWN_PRODUCTS
+        },
+    }.items(),
+    key=lambda item: len(item[0]),
+    reverse=True,
+)
 QUANTITY_RE = re.compile(r"(?P<value>\d+(?:[,.]\d+)?)\s*(?P<unit>кг|kg|г|g|л|l|шт|pcs|уп|x)?", re.I)
 
 
@@ -75,10 +102,10 @@ def parse_text_candidates(raw_text: str, source: str) -> list[DetectedIngredient
         normalized_line = normalize_name(line)
         if not normalized_line:
             continue
-        for product in KNOWN_PRODUCTS:
-            if product not in normalized_line:
+        for alias, product in TEXT_PRODUCT_ALIASES:
+            if alias not in normalized_line:
                 continue
-            quantity, unit = parse_quantity(normalized_line.replace(product, " "))
+            quantity, unit = parse_quantity(normalized_line.replace(alias, " "))
             candidates.append(
                 DetectedIngredient(
                     name=product,
@@ -86,7 +113,7 @@ def parse_text_candidates(raw_text: str, source: str) -> list[DetectedIngredient
                     unit=unit,
                     confidence=0.78,
                     source=f"{source}_text",
-                    reason="matched product name in receipt/OCR text",
+                    reason=f"matched product alias '{alias}' in receipt/OCR text",
                 )
             )
             break
