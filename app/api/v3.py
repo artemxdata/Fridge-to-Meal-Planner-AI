@@ -8,6 +8,8 @@ from app.schemas import (
     AcceptedPlanResponse,
     ApprovalEventResponse,
     AuditEventResponse,
+    CompanionStateRequest,
+    CompanionStateResponse,
     ContextInterpretRequest,
     ContextInterpretResponse,
     HouseholdResponse,
@@ -28,6 +30,7 @@ from app.services.approvals import (
     list_approval_events,
     override_plan_option,
 )
+from app.services.companion import build_companion_state
 from app.services.context import interpret_context
 from app.services.households import (
     audit_event_response,
@@ -56,6 +59,11 @@ def plan_options(request: PlanOptionsRequest) -> PlanOptionsResponse:
         return build_plan_options(request)
     except RecipeNotFoundError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+
+
+@router.post("/companion/state", response_model=CompanionStateResponse)
+def companion_state(request: CompanionStateRequest) -> CompanionStateResponse:
+    return build_companion_state(request)
 
 
 @router.get("/households/{household_id}/approval-events", response_model=list[ApprovalEventResponse])

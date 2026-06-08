@@ -43,6 +43,46 @@ def test_plan_options_are_explainable_drafts() -> None:
     assert all(len(option["plan"]["days"]) == 3 for option in data["options"])
 
 
+def test_companion_state_is_explainable_and_non_authoritative() -> None:
+    demo = client.get("/api/v2/demo").json()
+    options = client.post(
+        "/api/v3/plans/options",
+        json={
+            "pantry": demo["pantry"],
+            "budget_per_day": 520,
+            "target_calories": 1800,
+            "protein_goal_g": 95,
+            "days": 3,
+        },
+    ).json()["options"]
+    plan = next(option["plan"] for option in options if option["strategy"] == "balanced")
+
+    response = client.post(
+        "/api/v3/companion/state",
+        json={
+            "plan": plan,
+            "pantry": demo["pantry"],
+            "budget_per_day": 520,
+            "protein_goal_g": 95,
+            "days": 3,
+            "mascot": "nerpa",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["mascot"] == "nerpa"
+    assert 0 <= data["score"] <= 100
+    assert {signal["key"] for signal in data["signals"]} == {
+        "protein",
+        "budget",
+        "pantry_usage",
+        "waste_risk",
+        "shopping_load",
+    }
+    assert "does not judge the user" in data["assistant_boundary"]
+
+
 def test_v3_plan_options_respect_requested_horizon() -> None:
     response = client.post(
         "/api/v3/plans/options",

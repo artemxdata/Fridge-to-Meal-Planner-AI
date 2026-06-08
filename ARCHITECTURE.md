@@ -58,6 +58,15 @@ V3 plan options already apply visible policy constraints before ranking: allergi
 no-shop mode, low-dishes preference, max cooking time, and strict budget. Applied constraints are included in
 the decision trace.
 
+## Companion State
+
+The companion is a deterministic UX layer over already visible plan signals. It can summarize protein target
+fit, budget fit, pantry usage, use-soon items, and shopping load. It must not infer body shape, shame the user,
+approve plans, change pantry facts, or make autonomous health decisions.
+
+The current mascot direction is a neutral nerpa-style companion. Its state reflects system workload and plan
+trade-offs, not the user's body.
+
 ## Perception Flow
 
 ```text
@@ -83,6 +92,7 @@ Implemented now:
 - confirmed pantry lots;
 - latest accepted plan state after explicit plan approval;
 - deterministic policy constraints for v3 plan options;
+- deterministic companion state for explainable plan feedback;
 - append-only approval events for plan approval and override;
 - append-only approval events for item-level shopping decisions;
 - append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions.
@@ -113,3 +123,4 @@ authentication.
 - No policy YAML or OR-Tools constraint solver yet.
 - No React PWA or offline state management yet.
 - No calibrated CV/OCR models, production barcode database, or evaluation dataset.
+- No final mascot asset system or animation pipeline yet.

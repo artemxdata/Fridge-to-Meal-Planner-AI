@@ -167,6 +167,45 @@ class ContextInterpretResponse(BaseModel):
     requires_confirmation: bool = True
 
 
+CompanionMood = Literal[
+    "steady",
+    "needs_protein",
+    "budget_watch",
+    "use_soon",
+    "shopping_heavy",
+    "overloaded",
+]
+
+
+class CompanionSignal(BaseModel):
+    key: str
+    label: str
+    value: str
+    status: Literal["good", "watch", "action"]
+    explanation: str
+    source: str
+
+
+class CompanionStateRequest(BaseModel):
+    plan: dict[str, Any] = Field(default_factory=dict)
+    pantry: list[PantryItem] = Field(default_factory=list, max_length=300)
+    protein_goal_g: int | None = Field(default=100, ge=0, le=1000)
+    budget_per_day: float = Field(default=500, gt=0)
+    days: int = Field(default=3, ge=1, le=14)
+    mascot: Literal["nerpa", "sunflower", "kitchen_helper"] = "nerpa"
+
+
+class CompanionStateResponse(BaseModel):
+    mascot: str
+    state: CompanionMood
+    display_name: str
+    score: int = Field(ge=0, le=100)
+    message: str
+    visual_hint: str
+    signals: list[CompanionSignal]
+    assistant_boundary: str
+
+
 class HouseholdResponse(BaseModel):
     id: str
     name: str

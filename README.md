@@ -24,6 +24,7 @@ a final shopping list.
 - Approve or override a draft plan from the local demo UI and inspect persisted approval events.
 - Review the accepted plan and approve, skip, or change individual shopping-list items.
 - Apply visible policy constraints: allergies, disliked ingredients, no-shop mode, low-dishes mode, max cooking time, and strict budget.
+- Show an explainable companion state that reflects plan signals without judging the user or approving decisions.
 - Run without an LLM, external API, GPU, or model weights.
 
 ## Trust Model
@@ -114,6 +115,14 @@ curl -X POST http://127.0.0.1:8000/api/v2/perception/parse \
   -d '{"raw_text":"Йогурт 2 шт\nКартофель 3 кг\nЯйца 10 шт","barcodes":["4600000000011"],"source":"receipt"}'
 ```
 
+Generate a non-authoritative companion state from a draft plan:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v3/companion/state \
+  -H "Content-Type: application/json" \
+  -d '{"plan":{"totals":{"protein_g":210,"cost":1200,"budget_limit":1560},"statistics":{"pantry_usage_percent":62},"shopping_list":[]},"protein_goal_g":95,"budget_per_day":520,"days":3,"mascot":"nerpa"}'
+```
+
 ## Development Checks
 
 ```powershell
@@ -149,6 +158,7 @@ SQLAlchemy models and v3 API.
 ## Current Limitations
 
 - The static frontend now demonstrates v3 option comparison, policy constraints, accepted plan state, and shopping-list item decisions.
+- Companion state is a deterministic UX layer, not a medical, body-image, or autonomous decision system.
 - The frontend is still a single static file, not a React PWA.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
@@ -159,9 +169,10 @@ SQLAlchemy models and v3 API.
 
 1. Replace the static frontend with a bilingual React PWA and richer state management.
 2. Add policy YAML, richer hard constraints, and OR-Tools optimization.
-3. Add real OCR integration and barcode databases before training custom computer vision.
-4. Build opt-in feedback datasets, ranking, and waste-risk models.
-5. Add authentication, household isolation, and production migrations.
+3. Evolve the companion into a tasteful mascot layer with opt-in visual states, accessibility, and no body-shaming.
+4. Add real OCR integration and barcode databases before training custom computer vision.
+5. Build opt-in feedback datasets, ranking, and waste-risk models.
+6. Add authentication, household isolation, and production migrations.
 
 ## Security
 

@@ -232,6 +232,28 @@
       background: var(--surface-soft);
     }
 
+    .companion-card {
+      display: grid;
+      grid-template-columns: 86px 1fr;
+      gap: 14px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: var(--surface-soft);
+    }
+
+    .mascot {
+      display: grid;
+      place-items: center;
+      min-height: 86px;
+      border-radius: 8px;
+      background: #eaf7f1;
+      color: var(--green-dark);
+      font-weight: 800;
+      text-align: center;
+    }
+
     @media (max-width: 1100px) {
       main { grid-template-columns: 1fr; }
       .options { grid-template-columns: 1fr; }
@@ -245,6 +267,7 @@
       .row input:nth-child(4) { grid-column: 1 / 3; }
       .row button { grid-column: 3; grid-row: 2 / 4; min-height: 86px; }
       .candidate { grid-template-columns: 26px 1fr; }
+      .companion-card { grid-template-columns: 1fr; }
       .cols, .metric-row { grid-template-columns: 1fr; }
     }
   </style>
@@ -367,6 +390,12 @@
       </section>
 
       <section>
+        <h2>Companion</h2>
+        <div id="companionStatus" class="status">Generate a draft plan to update the companion.</div>
+        <div id="companion"></div>
+      </section>
+
+      <section>
         <h2>Approval Events</h2>
         <div class="toolbar">
           <button class="light" onclick="loadApprovalEvents()">Refresh</button>
@@ -389,6 +418,7 @@
     let planOptions = [];
     let acceptedPlan = null;
     let lastDecision = null;
+    let companionState = null;
 
     const el = (id) => document.getElementById(id);
     const apiBase = () => el("baseUrl").value.trim().replace(/\/$/, "") || "http://127.0.0.1:8000";
@@ -666,6 +696,10 @@
         planOptions = data.options || [];
         el("planStatus").textContent = data.assistant_boundary;
         renderOptions();
+        const balanced = planOptions.find((option) => option.strategy === "balanced") || planOptions[0];
+        if (balanced) {
+          await refreshCompanion(balanced.plan);
+        }
         updateMetrics();
       } catch (err) {
         el("planStatus").textContent = err.message;
@@ -760,6 +794,56 @@
       `).join("");
     }
 
+    async function refreshCompanion(planPayload) {
+      if (!planPayload) return;
+      try {
+        const days = planPayload.days?.length || 3;
+        companionState = await api("/api/v3/companion/state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            plan: planPayload,
+            pantry,
+            protein_goal_g: Number(el("protein").value || 95),
+            budget_per_day: Number(el("budget").value || 520),
+            days,
+            mascot: "nerpa",
+          }),
+        });
+        renderCompanion();
+      } catch (err) {
+        el("companionStatus").textContent = err.message;
+      }
+    }
+
+    function renderCompanion() {
+      const box = el("companion");
+      if (!companionState) {
+        el("companionStatus").textContent = "Generate a draft plan to update the companion.";
+        box.innerHTML = "";
+        return;
+      }
+      el("companionStatus").textContent = companionState.assistant_boundary;
+      const signals = (companionState.signals || [])
+        .map((signal) => `
+          <span class="pill ${signal.status === "good" ? "green" : "amber"}" title="${escapeHtml(signal.explanation)}">
+            ${escapeHtml(signal.label)}: ${escapeHtml(signal.value)}
+          </span>
+        `)
+        .join("");
+      box.innerHTML = `
+        <div class="companion-card">
+          <div class="mascot">Nerpa<br>${escapeHtml(companionState.score)}%</div>
+          <div>
+            <h3>${escapeHtml(companionState.display_name)}: ${escapeHtml(companionState.state)}</h3>
+            <div>${escapeHtml(companionState.message)}</div>
+            <div class="small muted">${escapeHtml(companionState.visual_hint)}</div>
+            <div>${signals}</div>
+          </div>
+        </div>
+      `;
+    }
+
     async function approveOption(index) {
       if (!householdId) {
         await loadHousehold();
@@ -822,6 +906,9 @@
       try {
         acceptedPlan = await api(`/api/v3/households/${householdId}/plans/accepted/latest`);
         renderAcceptedPlan();
+        if (acceptedPlan?.plan_payload) {
+          await refreshCompanion(acceptedPlan.plan_payload);
+        }
       } catch (err) {
         el("acceptedPlanStatus").textContent = err.message;
       }
