@@ -87,6 +87,26 @@ class VisionResponse(BaseModel):
     notes: list[str]
 
 
+class PerceptionParseRequest(BaseModel):
+    raw_text: str = Field(default="", max_length=5000)
+    barcodes: list[str] = Field(default_factory=list, max_length=50)
+    source: Literal["receipt", "barcode", "label", "manual_ocr"] = "receipt"
+
+    @field_validator("barcodes")
+    @classmethod
+    def strip_barcodes(cls, values: list[str]) -> list[str]:
+        return [value.strip() for value in values if value.strip()]
+
+
+class PerceptionParseResponse(BaseModel):
+    items: list[DetectedIngredient]
+    raw_text: str = ""
+    barcodes: list[str] = Field(default_factory=list)
+    needs_confirmation: bool = True
+    fallback: str
+    notes: list[str]
+
+
 class HealthResponse(BaseModel):
     status: str
     version: str

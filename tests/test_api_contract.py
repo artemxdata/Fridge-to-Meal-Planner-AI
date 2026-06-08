@@ -73,3 +73,22 @@ def test_vision_candidates_always_require_confirmation() -> None:
 
     assert response.status_code == 200
     assert response.json()["needs_confirmation"] is True
+
+
+def test_receipt_and_barcode_parser_returns_confirmable_candidates() -> None:
+    response = client.post(
+        "/api/v2/perception/parse",
+        json={
+            "source": "receipt",
+            "raw_text": "Йогурт 2 шт\nКартофель 3 кг\nЯйца 10 шт",
+            "barcodes": ["4600000000011", "unknown-code"],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    names = {item["name"] for item in data["items"]}
+    assert {"йогурт", "картофель", "яйца", "молоко"} <= names
+    assert data["needs_confirmation"] is True
+    assert data["fallback"] == "receipt_barcode_heuristics"
+    assert any("Unknown barcodes" in note for note in data["notes"])

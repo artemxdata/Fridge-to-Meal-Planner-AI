@@ -6,7 +6,17 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from app.catalog import DEMO_PANTRY, recipes
 from app.config import settings
-from app.schemas import PlanRequest, PlanResponse, Recipe, SuggestRequest, ThreeDayPlanRequest, VisionResponse
+from app.schemas import (
+    PerceptionParseRequest,
+    PerceptionParseResponse,
+    PlanRequest,
+    PlanResponse,
+    Recipe,
+    SuggestRequest,
+    ThreeDayPlanRequest,
+    VisionResponse,
+)
+from app.services.perception import parse_perception
 from app.services.planner import RecipeNotFoundError, build_daily_plan, build_three_day_plan, suggest_recipe
 from app.services.vision import ImageTooLargeError, InvalidImageError, analyze_image, decode_image
 
@@ -88,3 +98,8 @@ async def analyze_photo(
         text_hint=text_hint[:1000],
         mode=mode,
     )
+
+
+@router.post("/perception/parse", response_model=PerceptionParseResponse)
+def parse_receipt_or_barcode(request: PerceptionParseRequest) -> PerceptionParseResponse:
+    return parse_perception(request)

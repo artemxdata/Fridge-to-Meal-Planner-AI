@@ -15,6 +15,7 @@ a final shopping list.
 ## Current Product Increment
 
 - Upload a fridge/product photo and receive low-confidence ingredient candidates.
+- Parse receipt/OCR text and demo barcodes into confirmable ingredient candidates.
 - Confirm or edit ingredients manually before using them.
 - Generate a three-day meal plan and explained shopping list.
 - Interpret RU/EN context such as `устал, хочу тёплое без магазина` into visible proposed constraints.
@@ -105,6 +106,14 @@ curl -X POST http://127.0.0.1:8000/api/v3/plans/options \
   -d '{"pantry":[{"name":"овсянка","quantity":2},{"name":"йогурт","quantity":2}],"budget_per_day":520,"days":1,"policy":{"allergies":["яйца"],"max_cooking_time_min":25,"low_dishes":true}}'
 ```
 
+Parse receipt text and demo barcodes into candidates:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v2/perception/parse \
+  -H "Content-Type: application/json" \
+  -d '{"raw_text":"Йогурт 2 шт\nКартофель 3 кг\nЯйца 10 шт","barcodes":["4600000000011"],"source":"receipt"}'
+```
+
 ## Development Checks
 
 ```powershell
@@ -118,6 +127,7 @@ Dependencies are separated by purpose:
 - `requirements.txt` - lightweight runtime.
 - `requirements-dev.txt` - tests, lint, formatting.
 - `requirements-vision.txt` - optional experimental YOLO/OpenCV stack.
+- Receipt/barcode parsing uses deterministic heuristics in the core runtime and does not require OCR libraries.
 
 ## Persistence
 
@@ -142,13 +152,14 @@ SQLAlchemy models and v3 API.
 - The frontend is still a single static file, not a React PWA.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
+- Receipt/barcode parsing is demo-grade and still requires user confirmation.
 - Docker Compose is verified locally with the FastAPI app and PostgreSQL service.
 
 ## Roadmap
 
 1. Replace the static frontend with a bilingual React PWA and richer state management.
 2. Add policy YAML, richer hard constraints, and OR-Tools optimization.
-3. Add barcode and receipt OCR before training custom computer vision.
+3. Add real OCR integration and barcode databases before training custom computer vision.
 4. Build opt-in feedback datasets, ranking, and waste-risk models.
 5. Add authentication, household isolation, and production migrations.
 

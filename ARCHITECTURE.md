@@ -70,6 +70,8 @@ Photo / receipt / barcode
 
 The current Pillow color/text heuristic is deliberately labeled as fallback. Generic YOLO code remains
 experimental and is not imported by the runtime.
+Receipt text and demo barcodes are parsed by deterministic heuristics in the core runtime. This gives the
+project a practical perception path before expensive OCR/CV work, while preserving manual confirmation.
 
 ## Persistence
 
@@ -110,4 +112,4 @@ authentication.
 - No authentication or household isolation yet.
 - No policy YAML or OR-Tools constraint solver yet.
 - No React PWA or offline state management yet.
-- No calibrated CV/OCR models or evaluation dataset.
+- No calibrated CV/OCR models, production barcode database, or evaluation dataset.

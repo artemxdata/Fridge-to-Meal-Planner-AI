@@ -277,8 +277,15 @@
         <label>Text hint
           <input id="textHint" placeholder="яйца, йогурт, курица, картофель" />
         </label>
+        <label>Receipt / OCR text
+          <textarea id="receiptText" placeholder="Йогурт 2 шт&#10;Картофель 3 кг&#10;Яйца 10 шт"></textarea>
+        </label>
+        <label>Barcodes
+          <input id="barcodeText" placeholder="4600000000011, 4600000000042" />
+        </label>
         <div class="toolbar">
           <button onclick="analyzePhoto()">Analyze</button>
+          <button class="secondary" onclick="parseReceipt()">Parse receipt/barcode</button>
           <button class="light" onclick="confirmCandidates()">Confirm checked</button>
         </div>
         <div id="visionStatus" class="status"></div>
@@ -442,6 +449,13 @@
       };
     }
 
+    function barcodeValues() {
+      return el("barcodeText").value
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+
     function addItem(item) {
       pantry.push(item || { name: "", quantity: 1, unit: "шт", expires_in_days: 7, source: "manual", confidence: 1 });
       savePantry();
@@ -534,6 +548,25 @@
         const data = await api("/api/v2/vision/analyze", { method: "POST", body: form });
         candidates = data.items || [];
         el("visionStatus").textContent = `Candidates: ${candidates.length}. needs_confirmation=${data.needs_confirmation}.`;
+        renderCandidates();
+      } catch (err) {
+        el("visionStatus").textContent = err.message;
+      }
+    }
+
+    async function parseReceipt() {
+      try {
+        const data = await api("/api/v2/perception/parse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source: "receipt",
+            raw_text: el("receiptText").value,
+            barcodes: barcodeValues(),
+          }),
+        });
+        candidates = data.items || [];
+        el("visionStatus").textContent = `Perception candidates: ${candidates.length}. needs_confirmation=${data.needs_confirmation}.`;
         renderCandidates();
       } catch (err) {
         el("visionStatus").textContent = err.message;
