@@ -6,6 +6,7 @@ COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY frontend/index.html ./index.html
+COPY frontend/public ./public
 COPY frontend/src ./src
 RUN npm run build
 

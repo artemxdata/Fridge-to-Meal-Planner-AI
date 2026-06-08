@@ -42,6 +42,18 @@ def test_react_pwa_route_serves_build_when_available() -> None:
     assert '<div id="root"></div>' in response.text
 
 
+def test_react_pwa_root_assets_are_served_when_build_exists() -> None:
+    for route in ["/manifest.webmanifest", "/service-worker.js", "/pwa-icon.svg"]:
+        response = client.get(route)
+
+        if not settings.react_frontend_path.exists():
+            assert response.status_code == 404
+            assert "React PWA asset not found" in response.text
+            continue
+
+        assert response.status_code == 200
+
+
 def test_demo_generates_three_day_plan_and_shopping_list() -> None:
     demo = client.get("/api/v2/demo").json()
     response = client.post(

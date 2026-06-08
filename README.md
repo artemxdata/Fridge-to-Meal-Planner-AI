@@ -87,7 +87,7 @@ npm.cmd run dev
 
 Open `http://127.0.0.1:5173`. The React app talks to the FastAPI backend at `http://127.0.0.1:8000`.
 
-Production React build served by FastAPI:
+Production React PWA build served by FastAPI:
 
 ```powershell
 cd frontend
@@ -97,6 +97,8 @@ python run_ultra_smart_app.py
 ```
 
 Open `http://127.0.0.1:8000/pwa`. The compatibility demo remains available at `/app`.
+The production build includes a web app manifest and a conservative service worker that caches the app shell
+and static assets, but deliberately avoids caching API, health, and documentation requests.
 
 Docker:
 
@@ -105,7 +107,7 @@ docker compose up --build
 ```
 
 Docker Compose starts the FastAPI app on `:8000` and a local PostgreSQL 16 database for v3 pantry/audit
-persistence. The Docker image builds the React frontend in a Node stage and serves the compiled PWA at `/pwa`.
+persistence. The Docker image builds the React PWA in a Node stage and serves the compiled app at `/pwa`.
 
 ## API Examples
 
@@ -193,8 +195,10 @@ SQLAlchemy models and v3 API.
 
 - The static frontend demonstrates the v3 flow and is retained as a compatibility demo at `/app`.
 - The React/Vite frontend in `frontend/` is the target PWA direction and can be served by FastAPI at `/pwa` after `npm run build`.
+- The PWA shell includes `manifest.webmanifest`, a maskable SVG icon, and a service worker for offline app-shell caching.
 - Companion state is a deterministic UX layer, not a medical, body-image, or autonomous decision system.
 - The Docker image builds and serves the React PWA, while local Python can run with or without `frontend/dist`.
+- Offline support is limited to the app shell and static assets; mutable API data is always fetched live.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Receipt/barcode parsing is demo-grade and still requires user confirmation.
@@ -202,7 +206,7 @@ SQLAlchemy models and v3 API.
 
 ## Roadmap
 
-1. Finish replacing the static frontend with the bilingual React PWA, offline state management, and richer UX polish.
+1. Finish replacing the static frontend with the bilingual React PWA, offline-safe local state management, and richer UX polish.
 2. Add policy YAML, richer hard constraints, and OR-Tools optimization.
 3. Evolve the companion into a tasteful mascot layer with opt-in visual states, accessibility, and no body-shaming.
 4. Add real OCR integration and barcode databases before training custom computer vision.

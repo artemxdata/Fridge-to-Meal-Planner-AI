@@ -1,0 +1,19 @@
+{
+  "name": "Fridge-to-Meal Planner AI",
+  "short_name": "Meal Planner AI",
+  "description": "Human-controlled food operations copilot for pantry, plans, and shopping decisions.",
+  "start_url": "/pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f3f6f8",
+  "theme_color": "#147a5c",
+  "categories": ["food", "health", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -91,6 +91,15 @@ def create_app() -> FastAPI:
             raise HTTPException(404, "index.html not found")
         return FileResponse(settings.frontend_path)
 
+    @app.get("/manifest.webmanifest", include_in_schema=False)
+    @app.get("/pwa-icon.svg", include_in_schema=False)
+    @app.get("/service-worker.js", include_in_schema=False)
+    def react_frontend_static(request: Request) -> FileResponse:
+        static_path = settings.react_frontend_dist_path / request.url.path.lstrip("/")
+        if not static_path.exists():
+            raise HTTPException(404, "React PWA asset not found. Run npm run build in frontend/.")
+        return FileResponse(static_path)
+
     @app.get("/pwa", include_in_schema=False)
     @app.get("/pwa/{path:path}", include_in_schema=False)
     def react_frontend(path: str = "") -> FileResponse:

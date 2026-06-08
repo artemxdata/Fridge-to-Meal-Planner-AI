@@ -35,7 +35,9 @@ The static `index.html` is a compatibility demo surface for the v3 human-control
 available at `/app`. The target frontend direction lives in `frontend/` as a React/Vite PWA candidate with
 componentized state for perception, observation confirmation, planning, companion feedback, accepted plans,
 and approval events. When `frontend/dist` exists, FastAPI serves the compiled React build at `/pwa`; the
-Docker image builds that frontend in a dedicated Node stage.
+Docker image builds that frontend in a dedicated Node stage. The React build includes a manifest, SVG icon,
+and a conservative service worker that caches only the app shell and static assets; API requests are always
+live to avoid stale pantry, approval, and shopping decisions.
 
 ## API Versions
 
@@ -127,6 +129,6 @@ authentication.
 - No production migrations for schema evolution yet.
 - No authentication or household isolation yet.
 - No policy YAML or OR-Tools constraint solver yet.
-- React PWA offline state management, install metadata, and final deploy routing are not finished yet.
+- React PWA offline-safe local state management and final deploy routing are not finished yet.
 - No calibrated CV/OCR models, production barcode database, or evaluation dataset.
 - No final mascot asset system or animation pipeline yet.
