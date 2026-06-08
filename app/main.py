@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v2 import router as v2_router
 from app.api.v3 import router as v3_router
@@ -41,6 +42,9 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Request-ID"],
     )
+    react_assets_path = settings.react_frontend_dist_path / "assets"
+    if react_assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=react_assets_path), name="pwa-assets")
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
@@ -66,6 +70,7 @@ def create_app() -> FastAPI:
             "version": settings.app_version,
             "docs": "/docs",
             "app": "/app",
+            "pwa": "/pwa",
             "recipes": len(recipes()),
         }
 
@@ -85,6 +90,13 @@ def create_app() -> FastAPI:
         if not settings.frontend_path.exists():
             raise HTTPException(404, "index.html not found")
         return FileResponse(settings.frontend_path)
+
+    @app.get("/pwa", include_in_schema=False)
+    @app.get("/pwa/{path:path}", include_in_schema=False)
+    def react_frontend(path: str = "") -> FileResponse:
+        if not settings.react_frontend_path.exists():
+            raise HTTPException(404, "React build not found. Run npm run build in frontend/.")
+        return FileResponse(settings.react_frontend_path)
 
     app.include_router(v2_router)
     app.include_router(v3_router)

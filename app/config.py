@@ -40,6 +40,8 @@ class Settings:
     recipes_path: Path = PROJECT_ROOT / "data" / "recipes_ru.json"
     demo_path: Path = PROJECT_ROOT / "data" / "demo_scenario.json"
     frontend_path: Path = PROJECT_ROOT / "index.html"
+    react_frontend_dist_path: Path = PROJECT_ROOT / "frontend" / "dist"
+    react_frontend_path: Path = react_frontend_dist_path / "index.html"
 
 
 settings = Settings()

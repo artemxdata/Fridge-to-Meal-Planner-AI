@@ -67,13 +67,13 @@ Python 3.14 environment, but the optional CV stack may not.
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt -r requirements-dev.txt
 python run_ultra_smart_app.py
 ```
 
 Open:
 
-- Product demo: `http://127.0.0.1:8000/app`
+- Legacy compatibility demo: `http://127.0.0.1:8000/app`
 - Swagger: `http://127.0.0.1:8000/docs`
 - Readiness: `http://127.0.0.1:8000/health/ready`
 
@@ -87,6 +87,17 @@ npm.cmd run dev
 
 Open `http://127.0.0.1:5173`. The React app talks to the FastAPI backend at `http://127.0.0.1:8000`.
 
+Production React build served by FastAPI:
+
+```powershell
+cd frontend
+npm.cmd run build
+cd ..
+python run_ultra_smart_app.py
+```
+
+Open `http://127.0.0.1:8000/pwa`. The compatibility demo remains available at `/app`.
+
 Docker:
 
 ```bash
@@ -94,7 +105,7 @@ docker compose up --build
 ```
 
 Docker Compose starts the FastAPI app on `:8000` and a local PostgreSQL 16 database for v3 pantry/audit
-persistence.
+persistence. The Docker image builds the React frontend in a Node stage and serves the compiled PWA at `/pwa`.
 
 ## API Examples
 
@@ -156,6 +167,8 @@ Dependencies are separated by purpose:
 - `requirements-vision.txt` - optional experimental YOLO/OpenCV stack.
 - Receipt/barcode parsing uses deterministic heuristics in the core runtime and does not require OCR libraries.
 
+GitHub Actions runs the same backend lint/test checks, frontend test/build checks, and Docker image build.
+
 ## Persistence
 
 The app now has a real persistence foundation:
@@ -178,10 +191,10 @@ SQLAlchemy models and v3 API.
 
 ## Current Limitations
 
-- The static frontend now demonstrates v3 option comparison, policy constraints, persisted observation candidates, accepted plan state, and shopping-list item decisions.
-- The React/Vite frontend candidate in `frontend/` is the target PWA direction and covers the same human-controlled flow with componentized UI.
+- The static frontend demonstrates the v3 flow and is retained as a compatibility demo at `/app`.
+- The React/Vite frontend in `frontend/` is the target PWA direction and can be served by FastAPI at `/pwa` after `npm run build`.
 - Companion state is a deterministic UX layer, not a medical, body-image, or autonomous decision system.
-- The FastAPI-served `index.html` is retained as a compatibility demo while the React PWA matures.
+- The Docker image builds and serves the React PWA, while local Python can run with or without `frontend/dist`.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Receipt/barcode parsing is demo-grade and still requires user confirmation.
@@ -189,7 +202,7 @@ SQLAlchemy models and v3 API.
 
 ## Roadmap
 
-1. Finish replacing the static frontend with the bilingual React PWA and richer state management.
+1. Finish replacing the static frontend with the bilingual React PWA, offline state management, and richer UX polish.
 2. Add policy YAML, richer hard constraints, and OR-Tools optimization.
 3. Evolve the companion into a tasteful mascot layer with opt-in visual states, accessibility, and no body-shaming.
 4. Add real OCR integration and barcode databases before training custom computer vision.

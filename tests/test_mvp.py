@@ -3,6 +3,7 @@ from io import BytesIO
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app.config import settings
 from run_ultra_smart_app import app
 
 client = TestClient(app)
@@ -15,6 +16,7 @@ def test_root_and_frontend() -> None:
     assert root.status_code == 200
     assert root.json()["ok"] is True
     assert root.json()["recipes"] > 0
+    assert root.json()["pwa"] == "/pwa"
     assert frontend.status_code == 200
     assert "Fridge-to-Meal Planner AI" in frontend.text
     assert "/api/v3/plans/options" in frontend.text
@@ -26,6 +28,18 @@ def test_root_and_frontend() -> None:
     assert "/api/v3/households/${householdId}/observations/${observationSessionId}/confirm" in frontend.text
     assert "Companion" in frontend.text
     assert "no_shop_mode" in frontend.text
+
+
+def test_react_pwa_route_serves_build_when_available() -> None:
+    response = client.get("/pwa")
+
+    if not settings.react_frontend_path.exists():
+        assert response.status_code == 404
+        assert "React build not found" in response.text
+        return
+
+    assert response.status_code == 200
+    assert '<div id="root"></div>' in response.text
 
 
 def test_demo_generates_three_day_plan_and_shopping_list() -> None:
