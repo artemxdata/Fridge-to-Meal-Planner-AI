@@ -93,6 +93,8 @@ pantry facts is auditable.
 ## Persistence
 
 The current persistence increment uses async SQLAlchemy with SQLite fallback and PostgreSQL in Docker Compose.
+Alembic migrations under `migrations/` are the production schema path; local development can still use
+`AUTO_CREATE_TABLES=true` for quick demos.
 
 Implemented now:
 
@@ -104,7 +106,8 @@ Implemented now:
 - deterministic companion state for explainable plan feedback;
 - append-only approval events for plan approval and override;
 - append-only approval events for item-level shopping decisions;
-- append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions.
+- append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions;
+- initial Alembic migration for the current persistence schema.
 
 Still planned:
 
@@ -126,7 +129,7 @@ authentication.
 
 ## Known Gaps
 
-- No production migrations for schema evolution yet.
+- No full deployment runbook for migration ordering, rollback, and backup/restore yet.
 - No authentication or household isolation yet.
 - No policy YAML or OR-Tools constraint solver yet.
 - React PWA offline-safe local state management and final deploy routing are not finished yet.

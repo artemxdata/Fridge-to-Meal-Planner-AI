@@ -29,10 +29,10 @@ jobs:
           python -m pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Ruff
-        run: python -m ruff check app tests run_ultra_smart_app.py
+        run: python -m ruff check app tests migrations run_ultra_smart_app.py
 
       - name: Black
-        run: python -m black --check app tests run_ultra_smart_app.py
+        run: python -m black --check app tests migrations run_ultra_smart_app.py
 
       - name: Pytest
         run: python -m pytest -q

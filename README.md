@@ -109,6 +109,15 @@ docker compose up --build
 Docker Compose starts the FastAPI app on `:8000` and a local PostgreSQL 16 database for v3 pantry/audit
 persistence. The Docker image builds the React PWA in a Node stage and serves the compiled app at `/pwa`.
 
+Production schema migrations:
+
+```bash
+AUTO_CREATE_TABLES=false alembic upgrade head
+```
+
+Local development keeps `AUTO_CREATE_TABLES=true` by default for fast demos. Production deployments should run
+Alembic migrations explicitly before starting the app with automatic table creation disabled.
+
 ## API Examples
 
 Interpret human context without applying it:
@@ -154,9 +163,10 @@ curl -X POST http://127.0.0.1:8000/api/v3/companion/state \
 ## Development Checks
 
 ```powershell
-.\.venv\Scripts\ruff.exe check app tests run_ultra_smart_app.py
-.\.venv\Scripts\black.exe --check app tests run_ultra_smart_app.py
+.\.venv\Scripts\ruff.exe check app tests migrations run_ultra_smart_app.py
+.\.venv\Scripts\black.exe --check app tests migrations run_ultra_smart_app.py
 .\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\alembic.exe upgrade head
 cd frontend
 npm.cmd run test
 npm.cmd run build
@@ -189,7 +199,8 @@ The app now has a real persistence foundation:
 - `GET /api/v3/households/{household_id}/audit-events` returns append-only audit events.
 
 Local Python uses SQLite by default. Docker Compose uses PostgreSQL. Both paths use the same async
-SQLAlchemy models and v3 API.
+SQLAlchemy models and v3 API. Alembic migrations live in `migrations/`; the first migration creates the
+current v3 persistence schema.
 
 ## Current Limitations
 
@@ -203,6 +214,7 @@ SQLAlchemy models and v3 API.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Receipt/barcode parsing is demo-grade and still requires user confirmation.
 - Docker Compose is verified locally with the FastAPI app and PostgreSQL service.
+- Production migrations are available through Alembic, but there is not yet a full deployment runbook.
 
 ## Roadmap
 
@@ -211,7 +223,7 @@ SQLAlchemy models and v3 API.
 3. Evolve the companion into a tasteful mascot layer with opt-in visual states, accessibility, and no body-shaming.
 4. Add real OCR integration and barcode databases before training custom computer vision.
 5. Build opt-in feedback datasets, ranking, and waste-risk models.
-6. Add authentication, household isolation, and production migrations.
+6. Add authentication, household isolation, and a full deployment runbook.
 
 ## Security
 
