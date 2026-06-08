@@ -51,6 +51,10 @@ app/
 ├── config.py     # environment-backed safe defaults
 ├── schemas.py    # public request/response contracts
 └── main.py       # application factory, health checks, middleware
+
+frontend/
+├── src/          # React/Vite product demo candidate
+└── package.json # frontend scripts and dependency lock
 ```
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for boundaries, current limitations, and the target direction.
@@ -72,6 +76,16 @@ Open:
 - Product demo: `http://127.0.0.1:8000/app`
 - Swagger: `http://127.0.0.1:8000/docs`
 - Readiness: `http://127.0.0.1:8000/health/ready`
+
+React frontend candidate:
+
+```powershell
+cd frontend
+npm.cmd install --cache .npm-cache
+npm.cmd run dev
+```
+
+Open `http://127.0.0.1:5173`. The React app talks to the FastAPI backend at `http://127.0.0.1:8000`.
 
 Docker:
 
@@ -130,6 +144,9 @@ curl -X POST http://127.0.0.1:8000/api/v3/companion/state \
 .\.venv\Scripts\ruff.exe check app tests run_ultra_smart_app.py
 .\.venv\Scripts\black.exe --check app tests run_ultra_smart_app.py
 .\.venv\Scripts\python.exe -m pytest -q
+cd frontend
+npm.cmd run test
+npm.cmd run build
 ```
 
 Dependencies are separated by purpose:
@@ -162,8 +179,9 @@ SQLAlchemy models and v3 API.
 ## Current Limitations
 
 - The static frontend now demonstrates v3 option comparison, policy constraints, persisted observation candidates, accepted plan state, and shopping-list item decisions.
+- The React/Vite frontend candidate in `frontend/` is the target PWA direction and covers the same human-controlled flow with componentized UI.
 - Companion state is a deterministic UX layer, not a medical, body-image, or autonomous decision system.
-- The frontend is still a single static file, not a React PWA.
+- The FastAPI-served `index.html` is retained as a compatibility demo while the React PWA matures.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.
 - Photo analysis is a safe color/text fallback, not reliable ingredient recognition.
 - Receipt/barcode parsing is demo-grade and still requires user confirmation.
@@ -171,7 +189,7 @@ SQLAlchemy models and v3 API.
 
 ## Roadmap
 
-1. Replace the static frontend with a bilingual React PWA and richer state management.
+1. Finish replacing the static frontend with the bilingual React PWA and richer state management.
 2. Add policy YAML, richer hard constraints, and OR-Tools optimization.
 3. Evolve the companion into a tasteful mascot layer with opt-in visual states, accessibility, and no body-shaming.
 4. Add real OCR integration and barcode databases before training custom computer vision.

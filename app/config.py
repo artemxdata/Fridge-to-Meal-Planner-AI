@@ -35,7 +35,7 @@ class Settings:
     auto_create_tables: bool = os.getenv("AUTO_CREATE_TABLES", "true").lower() == "true"
     cors_origins: tuple[str, ...] = _csv_env(
         "CORS_ORIGINS",
-        "http://127.0.0.1:8000,http://localhost:8000",
+        "http://127.0.0.1:8000,http://localhost:8000,http://127.0.0.1:5173,http://localhost:5173",
     )
     recipes_path: Path = PROJECT_ROOT / "data" / "recipes_ru.json"
     demo_path: Path = PROJECT_ROOT / "data" / "demo_scenario.json"

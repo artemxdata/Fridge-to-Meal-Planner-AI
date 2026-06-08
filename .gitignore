@@ -91,6 +91,13 @@ ml_models/**/*.pkl
 .coverage
 htmlcov/
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.npm-cache/
+frontend/coverage/
+
 # Temporary files
 *.tmp
 *.temp

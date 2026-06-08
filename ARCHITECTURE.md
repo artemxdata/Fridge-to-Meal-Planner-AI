@@ -31,8 +31,9 @@ Responsibilities:
 - `config`: environment-backed safe defaults and filesystem paths.
 
 The legacy `run_ultra_smart_app.py` remains a compatibility entrypoint only.
-The static `index.html` is a demo surface for the v3 human-control workflow: context interpretation,
-option comparison, accepted plan state, item-level shopping decisions, and approval-event history.
+The static `index.html` is a compatibility demo surface for the v3 human-control workflow. The target
+frontend direction now lives in `frontend/` as a React/Vite PWA candidate with componentized state for
+perception, observation confirmation, planning, companion feedback, accepted plans, and approval events.
 
 ## API Versions
 
@@ -124,6 +125,6 @@ authentication.
 - No production migrations for schema evolution yet.
 - No authentication or household isolation yet.
 - No policy YAML or OR-Tools constraint solver yet.
-- No React PWA or offline state management yet.
+- React PWA is scaffolded, but offline state management and production build serving are not finished yet.
 - No calibrated CV/OCR models, production barcode database, or evaluation dataset.
 - No final mascot asset system or animation pipeline yet.
