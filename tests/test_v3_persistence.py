@@ -184,6 +184,37 @@ def test_approve_plan_option_creates_approval_and_audit_events() -> None:
     )
 
 
+def test_latest_accepted_plan_returns_current_active_approval() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    first_option = _draft_plan_option()
+    second_option = {**_draft_plan_option(), "option_id": "second-option", "title": "Second option"}
+
+    first = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={
+            "actor": "test-user",
+            "reason": "first approval",
+            "option": first_option,
+        },
+    ).json()
+    second = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={
+            "actor": "test-user",
+            "reason": "second approval",
+            "option": second_option,
+        },
+    ).json()
+
+    accepted = client.get(f"/api/v3/households/{household_id}/plans/accepted/latest")
+
+    assert accepted.status_code == 200
+    accepted_plan = accepted.json()
+    assert accepted_plan["id"] == second["approved_payload"]["accepted_plan_id"]
+    assert accepted_plan["id"] != first["approved_payload"]["accepted_plan_id"]
+    assert accepted_plan["status"] == "active"
+
+
 def test_shopping_item_decision_creates_append_only_event() -> None:
     household_id = client.get("/api/v3/households/demo").json()["id"]
     option = _draft_plan_option()

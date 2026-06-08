@@ -14,7 +14,9 @@ import React from "react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  buildPlanOverridePayload,
   buildPlanPayload,
+  buildShoppingDecisionPayload,
   candidateConfirmations,
   companionTone,
   optionMetrics,
@@ -41,7 +43,7 @@ function emptyPantryItem() {
   return {
     name: "",
     quantity: 1,
-    unit: "шт",
+    unit: "pcs",
     expires_in_days: 7,
     source: "manual",
     confidence: 1,
@@ -51,6 +53,14 @@ function emptyPantryItem() {
 function loadLocalPantry() {
   try {
     return JSON.parse(localStorage.getItem("ftm_react_pantry") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function loadLocalHistory() {
+  try {
+    return JSON.parse(localStorage.getItem("ftm_activity_history") || "[]");
   } catch {
     return [];
   }
@@ -87,12 +97,16 @@ function App() {
   const [planOptions, setPlanOptions] = useState([]);
   const [acceptedPlan, setAcceptedPlan] = useState(null);
   const [events, setEvents] = useState([]);
+  const [history, setHistory] = useState(loadLocalHistory);
+  const [busy, setBusy] = useState({});
+  const [shoppingDecisions, setShoppingDecisions] = useState({});
+  const [overrideNotes, setOverrideNotes] = useState({});
   const [companion, setCompanion] = useState(null);
   const [form, setForm] = useState(initialForm);
-  const [receiptText, setReceiptText] = useState("Йогурт 2 шт\nКартофель 3 кг\nЯйца 10 шт");
+  const [receiptText, setReceiptText] = useState("yogurt 2 pcs\npotato 3 kg\neggs 10 pcs");
   const [barcodeText, setBarcodeText] = useState("4600000000011");
   const [photoFile, setPhotoFile] = useState(null);
-  const [textHint, setTextHint] = useState("яйца, йогурт, картофель");
+  const [textHint, setTextHint] = useState("eggs, yogurt, potato");
   const [status, setStatus] = useState({
     workspace: "",
     perception: "No candidates yet.",
@@ -121,11 +135,15 @@ function App() {
   }, [pantry]);
 
   useEffect(() => {
+    localStorage.setItem("ftm_activity_history", JSON.stringify(history.slice(0, 30)));
+  }, [history]);
+
+  useEffect(() => {
     if (!pantry.length) {
       setPantry([
-        { name: "яйца", quantity: 4, unit: "шт", expires_in_days: 5, source: "sample", confidence: 1 },
-        { name: "йогурт", quantity: 2, unit: "шт", expires_in_days: 3, source: "sample", confidence: 1 },
-        { name: "картофель", quantity: 3, unit: "шт", expires_in_days: 12, source: "sample", confidence: 1 },
+        { name: "eggs", quantity: 4, unit: "pcs", expires_in_days: 5, source: "sample", confidence: 1 },
+        { name: "yogurt", quantity: 2, unit: "pcs", expires_in_days: 3, source: "sample", confidence: 1 },
+        { name: "potato", quantity: 3, unit: "pcs", expires_in_days: 12, source: "sample", confidence: 1 },
       ]);
     }
     loadHousehold();
@@ -134,6 +152,25 @@ function App() {
 
   function setStatusKey(key, value) {
     setStatus((current) => ({ ...current, [key]: value }));
+  }
+
+  function setBusyKey(key, value) {
+    setBusy((current) => ({ ...current, [key]: value }));
+  }
+
+  function addHistory(type, message, payload = {}) {
+    setHistory((current) =>
+      [
+        {
+          id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+          at: new Date().toISOString(),
+          type,
+          message,
+          payload,
+        },
+        ...current,
+      ].slice(0, 30),
+    );
   }
 
   async function api(path, options = {}) {
@@ -161,6 +198,7 @@ function App() {
 
   async function loadDemo() {
     try {
+      setBusyKey("workspace", true);
       const demo = await api("/api/v2/demo");
       setPantry(demo.pantry || []);
       setForm((current) => ({
@@ -172,8 +210,11 @@ function App() {
       }));
       const id = await loadHousehold();
       setStatusKey("workspace", `${demo.scenario || "Demo loaded."} ${id ? `(${id})` : ""}`);
+      addHistory("workspace", "Demo data loaded", { household_id: id || null });
     } catch (error) {
       setStatusKey("workspace", error.message);
+    } finally {
+      setBusyKey("workspace", false);
     }
   }
 
@@ -241,6 +282,7 @@ function App() {
 
   async function parseReceipt() {
     try {
+      setBusyKey("perception", true);
       setStatusKey("perception", "Parsing receipt and barcodes...");
       const data = await api("/api/v2/perception/parse", {
         method: "POST",
@@ -264,8 +306,14 @@ function App() {
         "perception",
         `Candidates: ${stored.items.length}. needs_confirmation=${data.needs_confirmation}. Stored observation: ${stored.observationId || "-"}.`,
       );
+      addHistory("perception", `Stored ${stored.items.length} receipt/barcode candidates`, {
+        observation_id: stored.observationId || null,
+        fallback: data.fallback,
+      });
     } catch (error) {
       setStatusKey("perception", error.message);
+    } finally {
+      setBusyKey("perception", false);
     }
   }
 
@@ -275,6 +323,7 @@ function App() {
       return;
     }
     try {
+      setBusyKey("perception", true);
       setStatusKey("perception", "Analyzing photo...");
       const body = new FormData();
       body.append("file", photoFile);
@@ -294,8 +343,14 @@ function App() {
         "perception",
         `Photo candidates: ${stored.items.length}. needs_confirmation=${data.needs_confirmation}. Stored observation: ${stored.observationId || "-"}.`,
       );
+      addHistory("perception", `Stored ${stored.items.length} photo candidates`, {
+        observation_id: stored.observationId || null,
+        fallback: data.fallback,
+      });
     } catch (error) {
       setStatusKey("perception", error.message);
+    } finally {
+      setBusyKey("perception", false);
     }
   }
 
@@ -307,6 +362,7 @@ function App() {
     }
 
     try {
+      setBusyKey("perception", true);
       if (observationSessionId && selected.every((candidate) => candidate.observation_candidate_id)) {
         const id = householdId || (await loadHousehold());
         await api(`/api/v3/households/${id}/observations/${observationSessionId}/confirm`, {
@@ -324,7 +380,7 @@ function App() {
         ...selected.map((item) => ({
           name: item.name,
           quantity: Number(item.quantity || 1),
-          unit: item.unit || "шт",
+          unit: item.unit || "pcs",
           expires_in_days: item.expires_in_days ?? null,
           source: item.source || "vision_candidate",
           confidence: item.confidence ?? null,
@@ -333,8 +389,11 @@ function App() {
       setCandidates([]);
       setObservationSessionId("");
       setStatusKey("perception", "Selected candidates confirmed into pantry.");
+      addHistory("pantry", `Confirmed ${selected.length} perception candidates into pantry`);
     } catch (error) {
       setStatusKey("perception", error.message);
+    } finally {
+      setBusyKey("perception", false);
     }
   }
 
@@ -344,6 +403,7 @@ function App() {
       return;
     }
     try {
+      setBusyKey("workspace", true);
       const id = householdId || (await loadHousehold());
       await api(`/api/v3/households/${id}/pantry/confirm`, {
         method: "POST",
@@ -355,8 +415,11 @@ function App() {
         }),
       });
       setStatusKey("workspace", "Pantry confirmation saved to v3.");
+      addHistory("pantry", `Saved ${pantry.length} pantry items to v3`, { household_id: id });
     } catch (error) {
       setStatusKey("workspace", error.message);
+    } finally {
+      setBusyKey("workspace", false);
     }
   }
 
@@ -378,6 +441,7 @@ function App() {
 
   async function generatePlanOptions() {
     try {
+      setBusyKey("plan", true);
       setStatusKey("plan", "Generating explainable draft options...");
       const payload = buildPlanPayload({ pantry, form });
       const data = await api("/api/v3/plans/options", {
@@ -392,8 +456,13 @@ function App() {
       if (balanced) {
         await refreshCompanion(balanced.plan);
       }
+      addHistory("plan", `Generated ${options.length} explainable draft options`, {
+        strategies: options.map((option) => option.strategy),
+      });
     } catch (error) {
       setStatusKey("plan", error.message);
+    } finally {
+      setBusyKey("plan", false);
     }
   }
 
@@ -421,6 +490,7 @@ function App() {
 
   async function approveOption(option) {
     try {
+      setBusyKey(`approve-${option.option_id}`, true);
       const id = householdId || (await loadHousehold());
       const event = await api(`/api/v3/households/${id}/plans/approve`, {
         method: "POST",
@@ -432,9 +502,80 @@ function App() {
         }),
       });
       setStatusKey("plan", `Approved: ${event.target_id}`);
+      addHistory("approval", `Approved draft option: ${option.title}`, {
+        option_id: option.option_id,
+        approval_event_id: event.id,
+      });
       await Promise.all([loadAcceptedPlan(id), loadApprovalEvents(id)]);
     } catch (error) {
       setStatusKey("plan", error.message);
+    } finally {
+      setBusyKey(`approve-${option.option_id}`, false);
+    }
+  }
+
+  async function overrideOption(option) {
+    const note = overrideNotes[option.option_id] || "Prefer less shopping and lower cleanup before approval.";
+    try {
+      setBusyKey(`override-${option.option_id}`, true);
+      const id = householdId || (await loadHousehold());
+      const event = await api(`/api/v3/households/${id}/plans/override`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          actor: "demo-user",
+          reason: note,
+          original_option: option,
+          override_payload: buildPlanOverridePayload(option, note),
+        }),
+      });
+      setStatusKey("plan", `Override recorded: ${event.id}`);
+      addHistory("override", `Requested override for draft option: ${option.title}`, {
+        option_id: option.option_id,
+        approval_event_id: event.id,
+      });
+      await loadApprovalEvents(id);
+    } catch (error) {
+      setStatusKey("plan", error.message);
+    } finally {
+      setBusyKey(`override-${option.option_id}`, false);
+    }
+  }
+
+  async function decideShoppingItem(item, index, decision) {
+    if (!acceptedPlan?.id) {
+      setStatusKey("accepted", "Approve a plan before reviewing shopping items.");
+      return;
+    }
+
+    const busyKey = `shopping-${index}-${decision}`;
+    try {
+      setBusyKey(busyKey, true);
+      const id = householdId || (await loadHousehold());
+      const event = await api(`/api/v3/households/${id}/shopping-list/decide`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          buildShoppingDecisionPayload({
+            acceptedPlanId: acceptedPlan.id,
+            item,
+            index,
+            decision,
+          }),
+        ),
+      });
+      setShoppingDecisions((current) => ({ ...current, [index]: decision }));
+      setStatusKey("accepted", `Shopping item ${decision}: ${item.name}`);
+      addHistory("shopping", `Shopping item ${decision}: ${item.name}`, {
+        approval_event_id: event.id,
+        accepted_plan_id: acceptedPlan.id,
+        item_index: index,
+      });
+      await loadApprovalEvents(id);
+    } catch (error) {
+      setStatusKey("accepted", error.message);
+    } finally {
+      setBusyKey(busyKey, false);
     }
   }
 
@@ -446,10 +587,10 @@ function App() {
           <p>Human-controlled food operations copilot. Candidates, drafts and decisions stay reviewable.</p>
         </div>
         <div className="topbar-actions">
-          <IconButton icon={RefreshCw} className="secondary" onClick={loadDemo}>
-            Demo
+          <IconButton icon={RefreshCw} className="secondary" disabled={busy.workspace} onClick={loadDemo}>
+            {busy.workspace ? "Loading" : "Demo"}
           </IconButton>
-          <IconButton icon={Database} className="light" onClick={loadHousehold}>
+          <IconButton icon={Database} className="light" disabled={busy.workspace} onClick={loadHousehold}>
             Household
           </IconButton>
         </div>
@@ -485,13 +626,13 @@ function App() {
               <input accept="image/*" type="file" onChange={(event) => setPhotoFile(event.target.files?.[0])} />
             </label>
             <div className="toolbar">
-              <IconButton icon={ScanLine} onClick={parseReceipt}>
-                Parse
+              <IconButton icon={ScanLine} disabled={busy.perception} onClick={parseReceipt}>
+                {busy.perception ? "Working" : "Parse"}
               </IconButton>
-              <IconButton icon={Camera} className="secondary" onClick={analyzePhoto}>
+              <IconButton icon={Camera} className="secondary" disabled={busy.perception} onClick={analyzePhoto}>
                 Analyze
               </IconButton>
-              <IconButton icon={Check} className="light" onClick={confirmCandidates}>
+              <IconButton icon={Check} className="light" disabled={busy.perception} onClick={confirmCandidates}>
                 Confirm
               </IconButton>
             </div>
@@ -506,7 +647,7 @@ function App() {
               <IconButton icon={ListChecks} className="light" onClick={() => setPantry([...pantry, emptyPantryItem()])}>
                 Add
               </IconButton>
-              <IconButton icon={Save} className="secondary" onClick={persistPantry}>
+              <IconButton icon={Save} className="secondary" disabled={busy.workspace} onClick={persistPantry}>
                 Save v3
               </IconButton>
               <IconButton icon={X} className="danger" onClick={() => setPantry([])}>
@@ -526,8 +667,8 @@ function App() {
             </IconButton>
             <div className="status">{status.context}</div>
             <PolicyForm form={form} setForm={setForm} />
-            <IconButton icon={ClipboardCheck} className="full" onClick={generatePlanOptions}>
-              Generate draft options
+            <IconButton icon={ClipboardCheck} className="full" disabled={busy.plan} onClick={generatePlanOptions}>
+              {busy.plan ? "Generating" : "Generate draft options"}
             </IconButton>
           </section>
         </aside>
@@ -551,7 +692,17 @@ function App() {
             <div className="option-grid">
               {planOptions.length ? (
                 planOptions.map((option) => (
-                  <PlanOptionCard key={option.option_id} option={option} onApprove={() => approveOption(option)} />
+                  <PlanOptionCard
+                    busy={busy}
+                    key={option.option_id}
+                    option={option}
+                    overrideNote={overrideNotes[option.option_id] || ""}
+                    onApprove={() => approveOption(option)}
+                    onOverride={() => overrideOption(option)}
+                    onOverrideNoteChange={(value) =>
+                      setOverrideNotes((current) => ({ ...current, [option.option_id]: value }))
+                    }
+                  />
                 ))
               ) : (
                 <div className="empty">No draft options yet.</div>
@@ -562,7 +713,13 @@ function App() {
           <section className="two-column">
             <div>
               <h2>Accepted Plan</h2>
-              <AcceptedPlan plan={acceptedPlan} status={status.accepted} />
+              <AcceptedPlan
+                busy={busy}
+                decisions={shoppingDecisions}
+                onShoppingDecision={decideShoppingItem}
+                plan={acceptedPlan}
+                status={status.accepted}
+              />
             </div>
             <div>
               <h2>Approval Events</h2>
@@ -571,6 +728,11 @@ function App() {
               </IconButton>
               <EventList events={events} />
             </div>
+          </section>
+
+          <section>
+            <h2>Activity Log</h2>
+            <ActivityLog items={history} onClear={() => setHistory([])} />
           </section>
         </section>
       </main>
@@ -597,7 +759,7 @@ function CandidateList({ candidates, updateCandidate }) {
             value={candidate.quantity || 1}
             onChange={(event) => updateCandidate(index, "quantity", Number(event.target.value || 1))}
           />
-          <input value={candidate.unit || "шт"} onChange={(event) => updateCandidate(index, "unit", event.target.value)} />
+          <input value={candidate.unit || "pcs"} onChange={(event) => updateCandidate(index, "unit", event.target.value)} />
           <span>{Math.round((candidate.confidence || 0) * 100)}%</span>
         </div>
       ))}
@@ -619,7 +781,7 @@ function PantryEditor({ pantry, setPantry, updatePantry }) {
             value={item.quantity}
             onChange={(event) => updatePantry(index, "quantity", Number(event.target.value || 1))}
           />
-          <input value={item.unit || "шт"} onChange={(event) => updatePantry(index, "unit", event.target.value)} />
+          <input value={item.unit || "pcs"} onChange={(event) => updatePantry(index, "unit", event.target.value)} />
           <input
             placeholder="days"
             type="number"
@@ -730,7 +892,14 @@ function CompanionCard({ companion, status }) {
   );
 }
 
-function PlanOptionCard({ option, onApprove }) {
+function PlanOptionCard({
+  busy,
+  option,
+  overrideNote,
+  onApprove,
+  onOverride,
+  onOverrideNoteChange,
+}) {
   const metrics = optionMetrics(option);
   return (
     <article className="option-card">
@@ -747,9 +916,22 @@ function PlanOptionCard({ option, onApprove }) {
         </div>
       </div>
       <div className="option-body">
-        <IconButton icon={Check} onClick={onApprove}>
-          Approve draft
-        </IconButton>
+        <div className="approval-box">
+          <IconButton icon={Check} disabled={busy[`approve-${option.option_id}`]} onClick={onApprove}>
+            {busy[`approve-${option.option_id}`] ? "Approving" : "Approve draft"}
+          </IconButton>
+          <label>
+            Human override note
+            <textarea
+              placeholder="Example: replace dinner with a faster low-cleanup option"
+              value={overrideNote}
+              onChange={(event) => onOverrideNoteChange(event.target.value)}
+            />
+          </label>
+          <IconButton icon={X} className="light" disabled={busy[`override-${option.option_id}`]} onClick={onOverride}>
+            {busy[`override-${option.option_id}`] ? "Recording" : "Request override"}
+          </IconButton>
+        </div>
         <h4>Decision trace</h4>
         <ul>
           {(option.decision_trace || []).map((item) => (
@@ -782,7 +964,7 @@ function PlanOptionCard({ option, onApprove }) {
   );
 }
 
-function ShoppingList({ items }) {
+function ShoppingList({ busy = {}, decisions = {}, items, onDecision }) {
   if (!items.length) return <div className="empty">No missing ingredients.</div>;
   return (
     <div className="shopping-list">
@@ -796,13 +978,39 @@ function ShoppingList({ items }) {
           <span>
             {item.missing_quantity} {item.unit}
           </span>
+          {onDecision ? (
+            <div className="shopping-actions">
+              {decisions[index] ? <Pill tone="good">{decisions[index]}</Pill> : null}
+              <button
+                disabled={busy[`shopping-${index}-approved`]}
+                type="button"
+                onClick={() => onDecision(item, index, "approved")}
+              >
+                Approve
+              </button>
+              <button
+                disabled={busy[`shopping-${index}-skipped`]}
+                type="button"
+                onClick={() => onDecision(item, index, "skipped")}
+              >
+                Skip
+              </button>
+              <button
+                disabled={busy[`shopping-${index}-changed`]}
+                type="button"
+                onClick={() => onDecision(item, index, "changed")}
+              >
+                Change
+              </button>
+            </div>
+          ) : null}
         </div>
       ))}
     </div>
   );
 }
 
-function AcceptedPlan({ plan, status }) {
+function AcceptedPlan({ busy, decisions, onShoppingDecision, plan, status }) {
   if (!plan) return <div className="empty">{status}</div>;
   const totals = plan.plan_payload?.totals || {};
   return (
@@ -814,7 +1022,12 @@ function AcceptedPlan({ plan, status }) {
         <Pill>{totals.cost || 0} rub</Pill>
         <Pill>{totals.protein_g || 0}g protein</Pill>
       </div>
-      <ShoppingList items={plan.shopping_list_payload || []} />
+      <ShoppingList
+        busy={busy}
+        decisions={decisions}
+        items={plan.shopping_list_payload || []}
+        onDecision={onShoppingDecision}
+      />
     </div>
   );
 }
@@ -831,6 +1044,28 @@ function EventList({ events }) {
           </div>
           <p>{event.reason}</p>
           <span>{event.created_at}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActivityLog({ items, onClear }) {
+  if (!items.length) return <div className="empty">No local activity yet.</div>;
+  return (
+    <div className="activity-log">
+      <button className="text-button" type="button" onClick={onClear}>
+        Clear local log
+      </button>
+      {items.slice(0, 12).map((item) => (
+        <div className="activity-item" key={item.id}>
+          <Pill tone={item.type === "override" ? "watch" : item.type === "approval" ? "good" : "neutral"}>
+            {item.type}
+          </Pill>
+          <div>
+            <b>{item.message}</b>
+            <span>{new Date(item.at).toLocaleString()}</span>
+          </div>
         </div>
       ))}
     </div>

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildPlanOverridePayload,
   buildPlanPayload,
+  buildShoppingDecisionPayload,
   candidateConfirmations,
   companionTone,
   splitCsv,
@@ -49,7 +51,7 @@ describe("frontend domain helpers", () => {
           observation_candidate_id: "candidate-1",
           name: "yogurt",
           quantity: 2,
-          unit: "шт",
+          unit: "pcs",
           confidence: 0.8,
         },
         { selected: false, observation_candidate_id: "candidate-2", name: "milk" },
@@ -60,7 +62,7 @@ describe("frontend domain helpers", () => {
         item: {
           name: "yogurt",
           quantity: 2,
-          unit: "шт",
+          unit: "pcs",
           expires_in_days: null,
           source: "human_confirmed_observation",
           confidence: 0.8,
@@ -72,5 +74,36 @@ describe("frontend domain helpers", () => {
   it("keeps companion tones predictable", () => {
     expect(companionTone("steady")).toBe("good");
     expect(companionTone("shopping_heavy")).toBe("action");
+  });
+
+  it("builds explicit human override payloads", () => {
+    expect(
+      buildPlanOverridePayload(
+        { option_id: "balanced", strategy: "balanced" },
+        "replace dinner with a faster option",
+      ),
+    ).toEqual({
+      requested_change: "replace dinner with a faster option",
+      original_option_id: "balanced",
+      original_strategy: "balanced",
+      source: "react_demo_human_override",
+    });
+  });
+
+  it("adds override payload for changed shopping decisions", () => {
+    const payload = buildShoppingDecisionPayload({
+      acceptedPlanId: "plan-1",
+      item: { name: "beans", missing_quantity: 1, unit: "can" },
+      index: 2,
+      decision: "changed",
+    });
+
+    expect(payload).toMatchObject({
+      accepted_plan_id: "plan-1",
+      item_index: 2,
+      decision: "changed",
+      reason: "human changed this shopping item before buying",
+    });
+    expect(payload.override_payload.original_item.name).toBe("beans");
   });
 });

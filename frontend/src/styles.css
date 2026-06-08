@@ -74,6 +74,11 @@ button:hover {
   background: var(--green-dark);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 button.secondary {
   background: var(--blue);
 }
@@ -94,6 +99,19 @@ button.full {
 button.icon-only {
   width: 40px;
   padding: 0;
+}
+
+button.text-button {
+  min-height: auto;
+  justify-content: flex-start;
+  padding: 0;
+  background: transparent;
+  color: var(--blue);
+}
+
+button.text-button:hover {
+  background: transparent;
+  color: var(--green-dark);
 }
 
 input,
@@ -300,6 +318,20 @@ section,
   padding: 14px;
 }
 
+.approval-box {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.approval-box textarea {
+  min-height: 72px;
+}
+
 .day {
   border: 1px solid var(--line);
   border-left: 4px solid var(--green);
@@ -332,6 +364,22 @@ section,
   grid-template-columns: 20px 1fr auto;
   border-bottom: 1px solid #edf0f4;
   padding: 8px 0;
+}
+
+.shopping-actions {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.shopping-actions button {
+  min-height: 30px;
+  padding: 6px 8px;
+  background: #edf2f7;
+  color: var(--ink);
+  font-size: 12px;
 }
 
 .shopping-item p,
@@ -382,6 +430,33 @@ section,
   border-radius: 8px;
   background: var(--soft);
   padding: 10px;
+}
+
+.activity-log {
+  display: grid;
+  gap: 8px;
+}
+
+.activity-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--soft);
+  padding: 10px;
+}
+
+.activity-item b,
+.activity-item span {
+  display: block;
+}
+
+.activity-item span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 @media (max-width: 1180px) {

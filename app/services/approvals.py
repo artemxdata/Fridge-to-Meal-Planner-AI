@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AcceptedPlan, ApprovalEvent
+from app.models import AcceptedPlan, ApprovalEvent, now_utc
 from app.schemas import (
     AcceptedPlanResponse,
     ApprovalEventResponse,
@@ -76,6 +76,11 @@ async def approve_plan_option(
     )
     session.add(event)
     await session.flush()
+    await session.execute(
+        update(AcceptedPlan)
+        .where(AcceptedPlan.household_id == household_id, AcceptedPlan.status == "active")
+        .values(status="superseded", updated_at=now_utc())
+    )
     accepted_plan = AcceptedPlan(
         household_id=household_id,
         source_approval_event_id=event.id,
@@ -176,7 +181,7 @@ async def get_latest_accepted_plan(
 ) -> AcceptedPlan | None:
     result = await session.execute(
         select(AcceptedPlan)
-        .where(AcceptedPlan.household_id == household_id)
+        .where(AcceptedPlan.household_id == household_id, AcceptedPlan.status == "active")
         .order_by(AcceptedPlan.created_at.desc())
         .limit(1)
     )

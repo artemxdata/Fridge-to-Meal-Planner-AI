@@ -38,7 +38,7 @@ export function candidateConfirmations(candidates) {
       item: {
         name: candidate.name,
         quantity: Number(candidate.quantity || 1),
-        unit: candidate.unit || "шт",
+        unit: candidate.unit || "pcs",
         expires_in_days: candidate.expires_in_days ?? null,
         source: "human_confirmed_observation",
         confidence: candidate.confidence ?? null,
@@ -66,4 +66,39 @@ export function optionMetrics(option) {
     `${totals.cost || 0} rub`,
     `${option?.plan?.statistics?.pantry_usage_percent || 0}% pantry`,
   ];
+}
+
+export function buildPlanOverridePayload(option, note) {
+  return {
+    requested_change: note || "Review this draft before approval.",
+    original_option_id: option.option_id,
+    original_strategy: option.strategy,
+    source: "react_demo_human_override",
+  };
+}
+
+export function buildShoppingDecisionPayload({ acceptedPlanId, item, index, decision }) {
+  const payload = {
+    accepted_plan_id: acceptedPlanId,
+    item_index: index,
+    item_payload: item,
+    decision,
+    actor: "demo-user",
+    reason:
+      decision === "approved"
+        ? "needed for approved meal plan"
+        : decision === "skipped"
+          ? "human chose to skip this shopping item"
+          : "human changed this shopping item before buying",
+  };
+
+  if (decision === "changed") {
+    payload.override_payload = {
+      change_request: "adjust quantity or replace before purchase",
+      original_item: item,
+      source: "react_demo_shopping_override",
+    };
+  }
+
+  return payload;
 }
