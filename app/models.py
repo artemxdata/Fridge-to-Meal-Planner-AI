@@ -33,6 +33,10 @@ class Household(Base):
         back_populates="household",
         cascade="all, delete-orphan",
     )
+    observation_sessions: Mapped[list[ObservationSession]] = relationship(
+        back_populates="household",
+        cascade="all, delete-orphan",
+    )
     approval_events: Mapped[list[ApprovalEvent]] = relationship(
         back_populates="household",
         cascade="all, delete-orphan",
@@ -64,6 +68,47 @@ class PantryLot(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
     household: Mapped[Household] = relationship(back_populates="pantry_lots")
+
+
+class ObservationSession(Base):
+    __tablename__ = "observation_sessions"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
+    needs_confirmation: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    household: Mapped[Household] = relationship(back_populates="observation_sessions")
+    candidates: Mapped[list[ObservationCandidate]] = relationship(
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+class ObservationCandidate(Base):
+    __tablename__ = "observation_candidates"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    session_id: Mapped[str] = mapped_column(ForeignKey("observation_sessions.id"), nullable=False, index=True)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    ingredient_name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    quantity: Mapped[float] = mapped_column(Float, nullable=False)
+    unit: Mapped[str] = mapped_column(String(30), nullable=False, default="шт")
+    expires_in_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default="fallback")
+    confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.5)
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(40), nullable=False, default="pending")
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    session: Mapped[ObservationSession] = relationship(back_populates="candidates")
 
 
 class AuditEvent(Base):

@@ -72,6 +72,7 @@ trade-offs, not the user's body.
 ```text
 Photo / receipt / barcode
     -> candidate observations with source and confidence
+    -> pending observation session
     -> confidence policy
     -> user confirmation
     -> pantry lot
@@ -81,6 +82,8 @@ The current Pillow color/text heuristic is deliberately labeled as fallback. Gen
 experimental and is not imported by the runtime.
 Receipt text and demo barcodes are parsed by deterministic heuristics in the core runtime. This gives the
 project a practical perception path before expensive OCR/CV work, while preserving manual confirmation.
+V3 observation sessions persist candidates as pending records, so the gap between perception and confirmed
+pantry facts is auditable.
 
 ## Persistence
 
@@ -90,6 +93,7 @@ Implemented now:
 
 - demo household;
 - confirmed pantry lots;
+- pending and confirmed observation sessions;
 - latest accepted plan state after explicit plan approval;
 - deterministic policy constraints for v3 plan options;
 - deterministic companion state for explainable plan feedback;
@@ -101,7 +105,6 @@ Still planned:
 
 - households and users;
 - purchase events;
-- observation sessions and candidates;
 - consent events.
 
 All records must be scoped by `household_id`. Cross-household access tests are mandatory before exposing

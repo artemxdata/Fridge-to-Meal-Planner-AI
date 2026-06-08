@@ -415,6 +415,7 @@
     let householdId = "";
     let pantry = [];
     let candidates = [];
+    let observationSessionId = "";
     let planOptions = [];
     let acceptedPlan = null;
     let lastDecision = null;
@@ -486,6 +487,38 @@
         .filter(Boolean);
     }
 
+    async function storeObservation(source, data) {
+      if (!candidates.length) return;
+      if (!householdId) {
+        await loadHousehold();
+      }
+      if (!householdId) return;
+
+      const observation = await api(`/api/v3/households/${householdId}/observations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source,
+          actor: "demo-user",
+          reason: "stored frontend perception candidates",
+          candidates,
+          raw_payload: {
+            fallback: data.fallback || "",
+            notes: data.notes || [],
+            raw_text: data.raw_text || "",
+            image_quality: data.image_quality || {},
+            barcodes: data.barcodes || [],
+          },
+        }),
+      });
+      observationSessionId = observation.id;
+      candidates = candidates.map((item, index) => ({
+        ...item,
+        observation_candidate_id: observation.candidates?.[index]?.id || "",
+      }));
+      el("visionStatus").textContent += ` Stored observation: ${observation.id}.`;
+    }
+
     function addItem(item) {
       pantry.push(item || { name: "", quantity: 1, unit: "шт", expires_in_days: 7, source: "manual", confidence: 1 });
       savePantry();
@@ -550,15 +583,53 @@
       });
     }
 
-    function confirmCandidates() {
-      candidates.forEach((item, index) => {
-        if (el(`cand-${index}`)?.checked) {
-          addItem({ ...item, source: item.source || "vision_candidate" });
+    async function confirmCandidates() {
+      const selected = candidates
+        .map((item, index) => ({ item, index }))
+        .filter(({ index }) => el(`cand-${index}`)?.checked);
+
+      if (!selected.length) {
+        el("visionStatus").textContent = "No candidates selected.";
+        return;
+      }
+
+      if (observationSessionId && selected.every(({ item }) => item.observation_candidate_id)) {
+        if (!householdId) {
+          await loadHousehold();
         }
+        try {
+          await api(`/api/v3/households/${householdId}/observations/${observationSessionId}/confirm`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              actor: "demo-user",
+              reason: "user_confirmed_frontend_observation_candidates",
+              candidates: selected.map(({ item }) => ({
+                candidate_id: item.observation_candidate_id,
+                item: {
+                  name: item.name,
+                  quantity: Number(item.quantity || 1),
+                  unit: item.unit || "шт",
+                  expires_in_days: item.expires_in_days ?? null,
+                  source: "human_confirmed_observation",
+                  confidence: item.confidence ?? null,
+                },
+              })),
+            }),
+          });
+        } catch (err) {
+          el("visionStatus").textContent = err.message;
+          return;
+        }
+      }
+
+      selected.forEach(({ item }) => {
+        addItem({ ...item, source: item.source || "vision_candidate" });
       });
       candidates = [];
+      observationSessionId = "";
       renderCandidates();
-      el("visionStatus").textContent = "Кандидаты перенесены в confirmed pantry.";
+      el("visionStatus").textContent = "Candidates confirmed into pantry.";
     }
 
     async function analyzePhoto() {
@@ -578,6 +649,7 @@
         const data = await api("/api/v2/vision/analyze", { method: "POST", body: form });
         candidates = data.items || [];
         el("visionStatus").textContent = `Candidates: ${candidates.length}. needs_confirmation=${data.needs_confirmation}.`;
+        await storeObservation("photo", data);
         renderCandidates();
       } catch (err) {
         el("visionStatus").textContent = err.message;
@@ -597,6 +669,7 @@
         });
         candidates = data.items || [];
         el("visionStatus").textContent = `Perception candidates: ${candidates.length}. needs_confirmation=${data.needs_confirmation}.`;
+        await storeObservation("receipt", data);
         renderCandidates();
       } catch (err) {
         el("visionStatus").textContent = err.message;

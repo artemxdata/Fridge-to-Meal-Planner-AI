@@ -228,6 +228,58 @@ class PantryLotResponse(BaseModel):
     updated_at: str
 
 
+ObservationSource = Literal["photo", "receipt", "barcode", "label", "manual_ocr", "manual"]
+
+
+class ObservationSessionCreateRequest(BaseModel):
+    source: ObservationSource
+    candidates: list[DetectedIngredient] = Field(min_length=1, max_length=100)
+    raw_payload: dict[str, Any] = Field(default_factory=dict)
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(default="stored_observation_candidates", min_length=1, max_length=500)
+
+
+class ObservationCandidateResponse(BaseModel):
+    id: str
+    session_id: str
+    household_id: str
+    ingredient_name: str
+    display_name: str
+    quantity: float
+    unit: str
+    expires_in_days: int | None
+    source: str
+    confidence: float
+    reason: str
+    status: str
+    created_at: str
+    updated_at: str
+    confirmed_at: str | None
+
+
+class ObservationSessionResponse(BaseModel):
+    id: str
+    household_id: str
+    source: str
+    status: str
+    needs_confirmation: bool
+    raw_payload: dict[str, Any]
+    candidates: list[ObservationCandidateResponse]
+    created_at: str
+    updated_at: str
+
+
+class ObservationCandidateConfirmation(BaseModel):
+    candidate_id: str = Field(min_length=1, max_length=120)
+    item: PantryItem
+
+
+class ObservationConfirmRequest(BaseModel):
+    candidates: list[ObservationCandidateConfirmation] = Field(min_length=1, max_length=100)
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(default="user_confirmed_observation_candidates", min_length=1, max_length=500)
+
+
 class PantryConfirmationRequest(BaseModel):
     items: list[PantryItem] = Field(default_factory=list, min_length=1, max_length=100)
     actor: str = Field(default="demo-user", min_length=1, max_length=80)

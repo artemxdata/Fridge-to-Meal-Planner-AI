@@ -13,6 +13,9 @@ from app.schemas import (
     ContextInterpretRequest,
     ContextInterpretResponse,
     HouseholdResponse,
+    ObservationConfirmRequest,
+    ObservationSessionCreateRequest,
+    ObservationSessionResponse,
     PantryConfirmationRequest,
     PantryLotResponse,
     PlanApprovalRequest,
@@ -42,6 +45,12 @@ from app.services.households import (
     list_pantry_lots,
     pantry_lot_response,
 )
+from app.services.observations import (
+    confirm_observation_candidates,
+    create_observation_session,
+    list_observation_sessions,
+    observation_session_response,
+)
 from app.services.planner import RecipeNotFoundError, build_plan_options
 
 router = APIRouter(prefix="/api/v3", tags=["Human-controlled planning v3"])
@@ -64,6 +73,65 @@ def plan_options(request: PlanOptionsRequest) -> PlanOptionsResponse:
 @router.post("/companion/state", response_model=CompanionStateResponse)
 def companion_state(request: CompanionStateRequest) -> CompanionStateResponse:
     return build_companion_state(request)
+
+
+@router.post(
+    "/households/{household_id}/observations",
+    response_model=ObservationSessionResponse,
+)
+async def create_observation(
+    household_id: str,
+    request: ObservationSessionCreateRequest,
+    session: SessionDep,
+) -> ObservationSessionResponse:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    observation = await create_observation_session(session, household_id=household_id, request=request)
+    return observation_session_response(observation)
+
+
+@router.get(
+    "/households/{household_id}/observations",
+    response_model=list[ObservationSessionResponse],
+)
+async def observations(
+    household_id: str,
+    session: SessionDep,
+    limit: int = 20,
+) -> list[ObservationSessionResponse]:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    rows = await list_observation_sessions(session, household_id, max(1, min(limit, 100)))
+    return [observation_session_response(row) for row in rows]
+
+
+@router.post(
+    "/households/{household_id}/observations/{observation_id}/confirm",
+    response_model=ObservationSessionResponse,
+)
+async def confirm_observation(
+    household_id: str,
+    observation_id: str,
+    request: ObservationConfirmRequest,
+    session: SessionDep,
+) -> ObservationSessionResponse:
+    household = await get_household(session, household_id)
+    if household is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+    try:
+        observation, _lots = await confirm_observation_candidates(
+            session,
+            household_id=household_id,
+            observation_id=observation_id,
+            request=request,
+        )
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    return observation_session_response(observation)
 
 
 @router.get("/households/{household_id}/approval-events", response_model=list[ApprovalEventResponse])

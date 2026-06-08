@@ -35,6 +35,7 @@ Observation -> Candidate facts -> Human confirmation -> Deterministic planning
 ```
 
 - Vision output is always a candidate and always has `needs_confirmation=true`.
+- Observation candidates can be persisted as pending sessions before they become pantry facts.
 - V3 plans are always drafts and always have `requires_approval=true`.
 - Plan approval and override events are persisted before a draft becomes accepted state.
 - Context interpretation proposes structured constraints but requires confirmation.
@@ -145,6 +146,9 @@ The app now has a real persistence foundation:
 - `GET /api/v3/households/demo` creates a demo household and seeds confirmed pantry lots.
 - `GET /api/v3/households/{household_id}/pantry` returns confirmed pantry lots.
 - `POST /api/v3/households/{household_id}/pantry/confirm` records user-confirmed pantry items.
+- `POST /api/v3/households/{household_id}/observations` stores pending perception candidates.
+- `GET /api/v3/households/{household_id}/observations` returns pending and confirmed observation sessions.
+- `POST /api/v3/households/{household_id}/observations/{observation_id}/confirm` confirms selected candidates into pantry lots.
 - `POST /api/v3/households/{household_id}/plans/approve` records a human-approved plan option.
 - `POST /api/v3/households/{household_id}/plans/override` records a human override for a draft plan option.
 - `GET /api/v3/households/{household_id}/plans/accepted/latest` returns the latest accepted plan.
@@ -157,7 +161,7 @@ SQLAlchemy models and v3 API.
 
 ## Current Limitations
 
-- The static frontend now demonstrates v3 option comparison, policy constraints, accepted plan state, and shopping-list item decisions.
+- The static frontend now demonstrates v3 option comparison, policy constraints, persisted observation candidates, accepted plan state, and shopping-list item decisions.
 - Companion state is a deterministic UX layer, not a medical, body-image, or autonomous decision system.
 - The frontend is still a single static file, not a React PWA.
 - The bundled recipe catalog contains 50 demo recipes and approximate nutrition/cost values.

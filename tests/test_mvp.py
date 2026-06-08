@@ -22,6 +22,8 @@ def test_root_and_frontend() -> None:
     assert "/api/v3/households/${householdId}/shopping-list/decide" in frontend.text
     assert "/api/v2/perception/parse" in frontend.text
     assert "/api/v3/companion/state" in frontend.text
+    assert "/api/v3/households/${householdId}/observations" in frontend.text
+    assert "/api/v3/households/${householdId}/observations/${observationSessionId}/confirm" in frontend.text
     assert "Companion" in frontend.text
     assert "no_shop_mode" in frontend.text
 

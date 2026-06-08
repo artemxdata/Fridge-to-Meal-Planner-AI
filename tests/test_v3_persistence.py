@@ -54,6 +54,82 @@ def test_confirm_pantry_items_creates_lots_and_audit_event() -> None:
     )
 
 
+def test_observation_candidates_require_confirmation_before_pantry() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    create = client.post(
+        f"/api/v3/households/{household_id}/observations",
+        json={
+            "source": "receipt",
+            "actor": "test-user",
+            "reason": "stored parsed receipt candidates",
+            "raw_payload": {"fallback": "receipt_barcode_heuristics"},
+            "candidates": [
+                {
+                    "name": "йогурт",
+                    "quantity": 2,
+                    "unit": "шт",
+                    "confidence": 0.78,
+                    "source": "receipt_text",
+                    "reason": "matched product name",
+                },
+                {
+                    "name": "молоко",
+                    "quantity": 1,
+                    "unit": "шт",
+                    "confidence": 0.92,
+                    "source": "barcode_demo_catalog",
+                    "reason": "matched demo barcode",
+                },
+            ],
+        },
+    )
+
+    assert create.status_code == 200
+    observation = create.json()
+    assert observation["status"] == "pending"
+    assert observation["needs_confirmation"] is True
+    assert len(observation["candidates"]) == 2
+    assert all(candidate["status"] == "pending" for candidate in observation["candidates"])
+
+    candidate_id = observation["candidates"][0]["id"]
+    confirm = client.post(
+        f"/api/v3/households/{household_id}/observations/{observation['id']}/confirm",
+        json={
+            "actor": "test-user",
+            "reason": "confirmed one candidate after review",
+            "candidates": [
+                {
+                    "candidate_id": candidate_id,
+                    "item": {
+                        "name": "йогурт греческий",
+                        "quantity": 1,
+                        "unit": "шт",
+                        "source": "human_confirmed_observation",
+                        "confidence": 0.9,
+                    },
+                }
+            ],
+        },
+    )
+
+    assert confirm.status_code == 200
+    confirmed = confirm.json()
+    assert confirmed["status"] == "partially_confirmed"
+    confirmed_candidate = next(item for item in confirmed["candidates"] if item["id"] == candidate_id)
+    assert confirmed_candidate["status"] == "confirmed"
+    assert confirmed_candidate["display_name"] == "йогурт греческий"
+
+    pantry = client.get(f"/api/v3/households/{household_id}/pantry").json()
+    assert any(item["display_name"] == "йогурт греческий" for item in pantry)
+
+    observations = client.get(f"/api/v3/households/{household_id}/observations").json()
+    assert any(item["id"] == observation["id"] for item in observations)
+
+    audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
+    assert any(event["event_type"] == "observation_session_created" for event in audit)
+    assert any(event["event_type"] == "observation_candidates_confirmed" for event in audit)
+
+
 def _draft_plan_option() -> dict:
     demo = client.get("/api/v2/demo").json()
     response = client.post(
@@ -204,9 +280,37 @@ def test_unknown_household_returns_404() -> None:
         "/api/v3/households/unknown-household/pantry/confirm",
         json={"items": [{"name": "яйца", "quantity": 1}]},
     )
+    observations = client.get("/api/v3/households/unknown-household/observations")
+    create_observation = client.post(
+        "/api/v3/households/unknown-household/observations",
+        json={
+            "source": "manual",
+            "candidates": [
+                {
+                    "name": "eggs",
+                    "quantity": 1,
+                    "reason": "manual candidate",
+                }
+            ],
+        },
+    )
+    confirm_observation = client.post(
+        "/api/v3/households/unknown-household/observations/missing/confirm",
+        json={
+            "candidates": [
+                {
+                    "candidate_id": "missing",
+                    "item": {"name": "eggs", "quantity": 1},
+                }
+            ]
+        },
+    )
 
     assert pantry.status_code == 404
     assert confirm.status_code == 404
+    assert observations.status_code == 404
+    assert create_observation.status_code == 404
+    assert confirm_observation.status_code == 404
 
 
 def test_unknown_household_returns_404_for_plan_decisions() -> None:
