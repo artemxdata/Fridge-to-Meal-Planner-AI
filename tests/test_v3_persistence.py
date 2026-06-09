@@ -382,6 +382,87 @@ def test_shopping_item_decision_creates_append_only_event() -> None:
     )
 
 
+def test_purchase_event_records_confirmed_pantry_lots_and_audit_event() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    option = _draft_plan_option()
+    approval = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={
+            "actor": "test-user",
+            "reason": "approved before purchase",
+            "option": option,
+        },
+    ).json()
+    accepted_plan_id = approval["approved_payload"]["accepted_plan_id"]
+    item = approval["approved_payload"]["shopping_list"][0]
+    shopping_decision = client.post(
+        f"/api/v3/households/{household_id}/shopping-list/decide",
+        json={
+            "accepted_plan_id": accepted_plan_id,
+            "item_index": 0,
+            "item_payload": item,
+            "decision": "approved",
+            "actor": "test-user",
+            "reason": "buy this for the approved plan",
+        },
+    ).json()
+
+    purchase = client.post(
+        f"/api/v3/households/{household_id}/purchases",
+        json={
+            "source": "shopping_list",
+            "accepted_plan_id": accepted_plan_id,
+            "shopping_decision_event_id": shopping_decision["id"],
+            "items": [{"name": "milk", "quantity": 2, "unit": "pcs", "confidence": 1}],
+            "total_cost": 180,
+            "currency": "rub",
+            "actor": "test-user",
+            "reason": "confirmed after shopping",
+        },
+    )
+
+    assert purchase.status_code == 200
+    data = purchase.json()
+    event = data["event"]
+    lot = data["pantry_lots"][0]
+    assert event["source"] == "shopping_list"
+    assert event["accepted_plan_id"] == accepted_plan_id
+    assert event["shopping_decision_event_id"] == shopping_decision["id"]
+    assert event["currency"] == "RUB"
+    assert event["pantry_lot_ids"] == [lot["id"]]
+    assert lot["display_name"] == "milk"
+    assert lot["source"] == "purchase:shopping_list"
+    assert "explicit user action" in data["assistant_boundary"]
+
+    purchases = client.get(f"/api/v3/households/{household_id}/purchases").json()
+    assert any(item["id"] == event["id"] for item in purchases)
+
+    pantry = client.get(f"/api/v3/households/{household_id}/pantry").json()
+    assert any(item["id"] == lot["id"] for item in pantry)
+
+    audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
+    assert any(
+        item["event_type"] == "purchase_recorded" and item["object_id"] == event["id"] for item in audit
+    )
+
+
+def test_purchase_event_rejects_missing_accepted_plan() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+
+    response = client.post(
+        f"/api/v3/households/{household_id}/purchases",
+        json={
+            "source": "shopping_list",
+            "accepted_plan_id": "missing-plan",
+            "items": [{"name": "eggs", "quantity": 1}],
+            "reason": "should fail because linked plan is missing",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Accepted plan not found"
+
+
 def test_override_plan_option_requires_reason_and_payload() -> None:
     household_id = client.get("/api/v3/households/demo").json()["id"]
     option = _draft_plan_option()
@@ -494,6 +575,14 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
             "reason": "test consent",
         },
     )
+    purchases = client.get("/api/v3/households/unknown-household/purchases")
+    purchase_create = client.post(
+        "/api/v3/households/unknown-household/purchases",
+        json={
+            "items": [{"name": "eggs", "quantity": 1}],
+            "reason": "test purchase",
+        },
+    )
 
     assert approval_events.status_code == 404
     assert latest_plan.status_code == 404
@@ -503,3 +592,5 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
     assert consent_history.status_code == 404
     assert current_consents.status_code == 404
     assert consent_create.status_code == 404
+    assert purchases.status_code == 404
+    assert purchase_create.status_code == 404

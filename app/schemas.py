@@ -343,6 +343,56 @@ class CurrentConsentResponse(BaseModel):
     assistant_boundary: str
 
 
+PurchaseSource = Literal["manual", "shopping_list", "receipt_import", "correction"]
+
+
+class PurchaseEventCreateRequest(BaseModel):
+    items: list[PantryItem] = Field(min_length=1, max_length=100)
+    source: PurchaseSource = "manual"
+    accepted_plan_id: str | None = Field(default=None, min_length=1, max_length=120)
+    shopping_decision_event_id: str | None = Field(default=None, min_length=1, max_length=120)
+    total_cost: float | None = Field(default=None, ge=0, le=10000000)
+    currency: str = Field(default="RUB", min_length=1, max_length=10)
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(default="user_recorded_purchase", min_length=1, max_length=500)
+
+    @field_validator("accepted_plan_id", "shopping_decision_event_id")
+    @classmethod
+    def strip_optional_text(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+    @field_validator("currency")
+    @classmethod
+    def normalize_currency(cls, value: str) -> str:
+        return value.strip().upper()
+
+    @field_validator("actor", "reason")
+    @classmethod
+    def strip_purchase_text(cls, value: str) -> str:
+        return value.strip()
+
+
+class PurchaseEventResponse(BaseModel):
+    id: str
+    household_id: str
+    source: str
+    accepted_plan_id: str | None
+    shopping_decision_event_id: str | None
+    actor: str
+    reason: str
+    total_cost: float | None
+    currency: str
+    items_payload: list[dict[str, Any]]
+    pantry_lot_ids: list[str]
+    created_at: str
+
+
+class PurchaseRecordResponse(BaseModel):
+    event: PurchaseEventResponse
+    pantry_lots: list[PantryLotResponse]
+    assistant_boundary: str
+
+
 class PlanApprovalRequest(BaseModel):
     option: PlanOption
     actor: str = Field(default="demo-user", min_length=1, max_length=80)

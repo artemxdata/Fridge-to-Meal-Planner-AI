@@ -22,6 +22,9 @@ from app.schemas import (
     PlanOptionsRequest,
     PlanOptionsResponse,
     PlanOverrideRequest,
+    PurchaseEventCreateRequest,
+    PurchaseEventResponse,
+    PurchaseRecordResponse,
     ShoppingItemDecisionRequest,
 )
 from app.services.approvals import (
@@ -58,6 +61,12 @@ from app.services.observations import (
     observation_session_response,
 )
 from app.services.planner import RecipeNotFoundError, build_plan_options
+from app.services.purchases import (
+    list_purchase_events,
+    purchase_event_response,
+    purchase_record_response,
+    record_purchase_event,
+)
 
 router = APIRouter(prefix="/api/v3", tags=["Human-controlled planning v3"])
 
@@ -262,6 +271,35 @@ async def confirm_pantry(
         reason=request.reason,
     )
     return [pantry_lot_response(lot) for lot in lots]
+
+
+@router.post("/households/{household_id}/purchases", response_model=PurchaseRecordResponse)
+async def record_purchase(
+    household_id: str,
+    request: PurchaseEventCreateRequest,
+    session: SessionDep,
+    _household: HouseholdDep,
+) -> PurchaseRecordResponse:
+    try:
+        event, pantry_lots = await record_purchase_event(
+            session,
+            household_id=household_id,
+            request=request,
+        )
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    return purchase_record_response(event, pantry_lots)
+
+
+@router.get("/households/{household_id}/purchases", response_model=list[PurchaseEventResponse])
+async def purchases(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+    limit: int = 50,
+) -> list[PurchaseEventResponse]:
+    events = await list_purchase_events(session, household_id, max(1, min(limit, 100)))
+    return [purchase_event_response(event) for event in events]
 
 
 @router.get("/households/{household_id}/audit-events", response_model=list[AuditEventResponse])

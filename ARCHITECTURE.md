@@ -57,6 +57,8 @@ Confirmed pantry + explicit preferences + proposed context
     -> simple / waste-first / balanced draft plans
     -> decision trace and trade-offs
     -> ApprovalEvent after explicit approval or override
+    -> item-level shopping decisions
+    -> PurchaseEvent after explicit purchase confirmation
 ```
 
 The current scoring engine is a deterministic baseline. OR-Tools CP-SAT will replace it when recipe units,
@@ -113,6 +115,7 @@ Implemented now:
 - deterministic companion state for explainable plan feedback;
 - append-only approval events for plan approval and override;
 - append-only approval events for item-level shopping decisions;
+- purchase events that add user-confirmed shopping results back into pantry lots;
 - append-only consent events for private data retention, analytics, research, and model-training opt-in/out;
 - append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions;
 - Alembic migrations for the current persistence schema.
@@ -121,7 +124,6 @@ Implemented now:
 Still planned:
 
 - households and users;
-- purchase events;
 
 All records must be scoped by `household_id`. Cross-household access tests are mandatory before exposing
 authentication.

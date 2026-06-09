@@ -53,6 +53,10 @@ class Household(Base):
         back_populates="household",
         cascade="all, delete-orphan",
     )
+    purchase_events: Mapped[list[PurchaseEvent]] = relationship(
+        back_populates="household",
+        cascade="all, delete-orphan",
+    )
 
 
 class PantryLot(Base):
@@ -184,3 +188,22 @@ class ConsentEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
     household: Mapped[Household] = relationship(back_populates="consent_events")
+
+
+class PurchaseEvent(Base):
+    __tablename__ = "purchase_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    accepted_plan_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    shopping_decision_event_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    actor: Mapped[str] = mapped_column(String(80), nullable=False, default="demo-user")
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    total_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB")
+    items_payload: Mapped[list[dict[str, Any]]] = mapped_column(JSON, nullable=False, default=list)
+    pantry_lot_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    household: Mapped[Household] = relationship(back_populates="purchase_events")
