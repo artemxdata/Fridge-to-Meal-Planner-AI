@@ -46,6 +46,7 @@ live to avoid stale pantry, approval, and shopping decisions.
 
 V3 currently supports transparent context interpretation, explainable plan options, and durable plan
 approval/override events backed by persistence and audit history.
+Household-scoped routes use a shared dependency to reject unknown households before domain operations run.
 
 ## Decision Flow
 
@@ -109,6 +110,7 @@ Implemented now:
 - append-only approval events for item-level shopping decisions;
 - append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions;
 - initial Alembic migration for the current persistence schema.
+- centralized household existence checks for v3 household-scoped routes.
 
 Still planned:
 
@@ -132,7 +134,7 @@ authentication.
 ## Known Gaps
 
 - No full deployment runbook for migration ordering, rollback, and backup/restore yet.
-- No authentication or household isolation yet.
+- No authentication yet; household isolation is currently path-scoped and tested, but not identity-backed.
 - No policy YAML or OR-Tools constraint solver yet.
 - React PWA offline-safe local state management and final deploy routing are not finished yet.
 - No calibrated CV/OCR models, production barcode database, or evaluation dataset.

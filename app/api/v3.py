@@ -1,9 +1,6 @@
-from typing import Annotated
+from fastapi import APIRouter, HTTPException, status
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.db import get_session
+from app.api.dependencies import HouseholdDep, SessionDep
 from app.schemas import (
     AcceptedPlanResponse,
     ApprovalEventResponse,
@@ -38,7 +35,6 @@ from app.services.context import interpret_context
 from app.services.households import (
     audit_event_response,
     confirm_pantry_items,
-    get_household,
     get_or_create_demo_household,
     household_response,
     list_audit_events,
@@ -54,7 +50,6 @@ from app.services.observations import (
 from app.services.planner import RecipeNotFoundError, build_plan_options
 
 router = APIRouter(prefix="/api/v3", tags=["Human-controlled planning v3"])
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
 @router.post("/assistant/interpret-context", response_model=ContextInterpretResponse)
@@ -83,10 +78,8 @@ async def create_observation(
     household_id: str,
     request: ObservationSessionCreateRequest,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> ObservationSessionResponse:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     observation = await create_observation_session(session, household_id=household_id, request=request)
     return observation_session_response(observation)
 
@@ -98,11 +91,9 @@ async def create_observation(
 async def observations(
     household_id: str,
     session: SessionDep,
+    _household: HouseholdDep,
     limit: int = 20,
 ) -> list[ObservationSessionResponse]:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     rows = await list_observation_sessions(session, household_id, max(1, min(limit, 100)))
     return [observation_session_response(row) for row in rows]
 
@@ -116,10 +107,8 @@ async def confirm_observation(
     observation_id: str,
     request: ObservationConfirmRequest,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> ObservationSessionResponse:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     try:
         observation, _lots = await confirm_observation_candidates(
             session,
@@ -136,11 +125,8 @@ async def confirm_observation(
 
 @router.get("/households/{household_id}/approval-events", response_model=list[ApprovalEventResponse])
 async def approval_events(
-    household_id: str, session: SessionDep, limit: int = 50
+    household_id: str, session: SessionDep, _household: HouseholdDep, limit: int = 50
 ) -> list[ApprovalEventResponse]:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     events = await list_approval_events(session, household_id, max(1, min(limit, 100)))
     return [approval_event_response(event) for event in events]
 
@@ -149,10 +135,8 @@ async def approval_events(
 async def latest_accepted_plan(
     household_id: str,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> AcceptedPlanResponse | None:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     plan = await get_latest_accepted_plan(session, household_id)
     if plan is None:
         return None
@@ -164,10 +148,8 @@ async def approve_plan(
     household_id: str,
     request: PlanApprovalRequest,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> ApprovalEventResponse:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     event = await approve_plan_option(session, household_id=household_id, request=request)
     return approval_event_response(event)
 
@@ -177,10 +159,8 @@ async def decide_shopping_list_item(
     household_id: str,
     request: ShoppingItemDecisionRequest,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> ApprovalEventResponse:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     try:
         event = await decide_shopping_item(session, household_id=household_id, request=request)
     except IndexError as exc:
@@ -201,10 +181,8 @@ async def override_plan(
     household_id: str,
     request: PlanOverrideRequest,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> ApprovalEventResponse:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     if not request.override_payload:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "override_payload is required")
     event = await override_plan_option(session, household_id=household_id, request=request)
@@ -218,10 +196,11 @@ async def demo_household(session: SessionDep) -> HouseholdResponse:
 
 
 @router.get("/households/{household_id}/pantry", response_model=list[PantryLotResponse])
-async def pantry_lots(household_id: str, session: SessionDep) -> list[PantryLotResponse]:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+async def pantry_lots(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+) -> list[PantryLotResponse]:
     lots = await list_pantry_lots(session, household_id)
     return [pantry_lot_response(lot) for lot in lots]
 
@@ -231,10 +210,8 @@ async def confirm_pantry(
     household_id: str,
     request: PantryConfirmationRequest,
     session: SessionDep,
+    _household: HouseholdDep,
 ) -> list[PantryLotResponse]:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
     lots = await confirm_pantry_items(
         session,
         household_id=household_id,
@@ -246,9 +223,11 @@ async def confirm_pantry(
 
 
 @router.get("/households/{household_id}/audit-events", response_model=list[AuditEventResponse])
-async def audit_events(household_id: str, session: SessionDep, limit: int = 50) -> list[AuditEventResponse]:
-    household = await get_household(session, household_id)
-    if household is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Household not found")
+async def audit_events(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+    limit: int = 50,
+) -> list[AuditEventResponse]:
     events = await list_audit_events(session, household_id, max(1, min(limit, 100)))
     return [audit_event_response(event) for event in events]

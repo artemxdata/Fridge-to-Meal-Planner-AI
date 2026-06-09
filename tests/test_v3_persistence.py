@@ -1,8 +1,23 @@
+import asyncio
+import uuid
+
 from fastapi.testclient import TestClient
 
+from app.db import SessionLocal
 from app.main import app
+from app.models import Household
 
 client = TestClient(app)
+
+
+def _create_test_household(household_id: str) -> None:
+    async def create() -> None:
+        async with SessionLocal() as session:
+            if await session.get(Household, household_id) is None:
+                session.add(Household(id=household_id, name=f"Test household {household_id}", locale="ru"))
+                await session.commit()
+
+    asyncio.run(create())
 
 
 def test_demo_household_seeds_confirmed_pantry_and_audit_events() -> None:
@@ -128,6 +143,50 @@ def test_observation_candidates_require_confirmation_before_pantry() -> None:
     audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
     assert any(event["event_type"] == "observation_session_created" for event in audit)
     assert any(event["event_type"] == "observation_candidates_confirmed" for event in audit)
+
+
+def test_observation_confirmation_is_scoped_to_household() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    other_household_id = f"test-household-{uuid.uuid4()}"
+    _create_test_household(other_household_id)
+    create = client.post(
+        f"/api/v3/households/{household_id}/observations",
+        json={
+            "source": "manual",
+            "actor": "test-user",
+            "reason": "stored candidate for scope test",
+            "candidates": [
+                {
+                    "name": "eggs",
+                    "quantity": 1,
+                    "confidence": 0.7,
+                    "source": "manual",
+                    "reason": "scope test candidate",
+                }
+            ],
+        },
+    )
+
+    assert create.status_code == 200
+    observation = create.json()
+    candidate_id = observation["candidates"][0]["id"]
+
+    cross_household_confirm = client.post(
+        f"/api/v3/households/{other_household_id}/observations/{observation['id']}/confirm",
+        json={
+            "actor": "test-user",
+            "reason": "attempted cross-household confirmation",
+            "candidates": [
+                {
+                    "candidate_id": candidate_id,
+                    "item": {"name": "eggs", "quantity": 1},
+                }
+            ],
+        },
+    )
+
+    assert cross_household_confirm.status_code == 404
+    assert cross_household_confirm.json()["detail"] == "Observation session not found"
 
 
 def _draft_plan_option() -> dict:
