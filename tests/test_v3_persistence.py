@@ -243,6 +243,61 @@ def test_approve_plan_option_creates_approval_and_audit_events() -> None:
     )
 
 
+def test_consent_events_are_append_only_and_current_state_uses_latest_decision() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    consent_payload = {
+        "consent_type": "model_training",
+        "status": "granted",
+        "scope": "photo_feedback_dataset",
+        "actor": "test-user",
+        "reason": "opted in after reading privacy notice",
+        "policy_version": "privacy-v1",
+        "source": "test",
+        "payload": {"surface": "settings"},
+    }
+
+    grant = client.post(f"/api/v3/households/{household_id}/consent-events", json=consent_payload)
+    revoke = client.post(
+        f"/api/v3/households/{household_id}/consent-events",
+        json={
+            **consent_payload,
+            "status": "revoked",
+            "reason": "changed mind after review",
+        },
+    )
+
+    assert grant.status_code == 200
+    assert revoke.status_code == 200
+    assert grant.json()["status"] == "granted"
+    assert revoke.json()["status"] == "revoked"
+
+    history = client.get(f"/api/v3/households/{household_id}/consent-events").json()
+    history_ids = {event["id"] for event in history}
+    assert {grant.json()["id"], revoke.json()["id"]} <= history_ids
+
+    current = client.get(f"/api/v3/households/{household_id}/consents/current")
+    assert current.status_code == 200
+    current_items = current.json()["consents"]
+    current_training = next(
+        item
+        for item in current_items
+        if item["consent_type"] == "model_training" and item["scope"] == "photo_feedback_dataset"
+    )
+    assert current_training["id"] == revoke.json()["id"]
+    assert current_training["status"] == "revoked"
+    assert "append-only" in current.json()["assistant_boundary"]
+
+    audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
+    assert any(
+        event["event_type"] == "consent_granted" and event["object_id"] == grant.json()["id"]
+        for event in audit
+    )
+    assert any(
+        event["event_type"] == "consent_revoked" and event["object_id"] == revoke.json()["id"]
+        for event in audit
+    )
+
+
 def test_latest_accepted_plan_returns_current_active_approval() -> None:
     household_id = client.get("/api/v3/households/demo").json()["id"]
     first_option = _draft_plan_option()
@@ -429,9 +484,22 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
             "reason": "needed",
         },
     )
+    consent_history = client.get("/api/v3/households/unknown-household/consent-events")
+    current_consents = client.get("/api/v3/households/unknown-household/consents/current")
+    consent_create = client.post(
+        "/api/v3/households/unknown-household/consent-events",
+        json={
+            "consent_type": "analytics",
+            "status": "granted",
+            "reason": "test consent",
+        },
+    )
 
     assert approval_events.status_code == 404
     assert latest_plan.status_code == 404
     assert approve.status_code == 404
     assert override.status_code == 404
     assert shopping_decision.status_code == 404
+    assert consent_history.status_code == 404
+    assert current_consents.status_code == 404
+    assert consent_create.status_code == 404

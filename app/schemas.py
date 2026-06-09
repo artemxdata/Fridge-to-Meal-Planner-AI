@@ -298,6 +298,51 @@ class AuditEventResponse(BaseModel):
     created_at: str
 
 
+ConsentType = Literal[
+    "photo_retention",
+    "receipt_retention",
+    "analytics",
+    "model_training",
+    "product_research",
+]
+ConsentStatus = Literal["granted", "revoked", "denied"]
+
+
+class ConsentEventCreateRequest(BaseModel):
+    consent_type: ConsentType
+    status: ConsentStatus
+    scope: str = Field(default="household", min_length=1, max_length=120)
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(min_length=3, max_length=500)
+    policy_version: str = Field(default="privacy-v1", min_length=1, max_length=80)
+    source: str = Field(default="user_action", min_length=1, max_length=80)
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("scope", "actor", "reason", "policy_version", "source")
+    @classmethod
+    def strip_text_values(cls, value: str) -> str:
+        return value.strip()
+
+
+class ConsentEventResponse(BaseModel):
+    id: str
+    household_id: str
+    consent_type: str
+    scope: str
+    status: str
+    actor: str
+    reason: str
+    policy_version: str
+    source: str
+    payload: dict[str, Any]
+    created_at: str
+
+
+class CurrentConsentResponse(BaseModel):
+    consents: list[ConsentEventResponse]
+    assistant_boundary: str
+
+
 class PlanApprovalRequest(BaseModel):
     option: PlanOption
     actor: str = Field(default="demo-user", min_length=1, max_length=80)

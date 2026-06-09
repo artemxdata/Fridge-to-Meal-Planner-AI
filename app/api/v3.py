@@ -7,8 +7,11 @@ from app.schemas import (
     AuditEventResponse,
     CompanionStateRequest,
     CompanionStateResponse,
+    ConsentEventCreateRequest,
+    ConsentEventResponse,
     ContextInterpretRequest,
     ContextInterpretResponse,
+    CurrentConsentResponse,
     HouseholdResponse,
     ObservationConfirmRequest,
     ObservationSessionCreateRequest,
@@ -31,6 +34,13 @@ from app.services.approvals import (
     override_plan_option,
 )
 from app.services.companion import build_companion_state
+from app.services.consents import (
+    consent_event_response,
+    create_consent_event,
+    current_consent_response,
+    get_current_consents,
+    list_consent_events,
+)
 from app.services.context import interpret_context
 from app.services.households import (
     audit_event_response,
@@ -129,6 +139,38 @@ async def approval_events(
 ) -> list[ApprovalEventResponse]:
     events = await list_approval_events(session, household_id, max(1, min(limit, 100)))
     return [approval_event_response(event) for event in events]
+
+
+@router.post("/households/{household_id}/consent-events", response_model=ConsentEventResponse)
+async def record_consent_event(
+    household_id: str,
+    request: ConsentEventCreateRequest,
+    session: SessionDep,
+    _household: HouseholdDep,
+) -> ConsentEventResponse:
+    event = await create_consent_event(session, household_id=household_id, request=request)
+    return consent_event_response(event)
+
+
+@router.get("/households/{household_id}/consent-events", response_model=list[ConsentEventResponse])
+async def consent_events(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+    limit: int = 50,
+) -> list[ConsentEventResponse]:
+    events = await list_consent_events(session, household_id, max(1, min(limit, 100)))
+    return [consent_event_response(event) for event in events]
+
+
+@router.get("/households/{household_id}/consents/current", response_model=CurrentConsentResponse)
+async def current_consents(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+) -> CurrentConsentResponse:
+    events = await get_current_consents(session, household_id)
+    return current_consent_response(events)
 
 
 @router.get("/households/{household_id}/plans/accepted/latest", response_model=AcceptedPlanResponse | None)

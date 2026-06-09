@@ -49,6 +49,10 @@ class Household(Base):
         back_populates="household",
         cascade="all, delete-orphan",
     )
+    consent_events: Mapped[list[ConsentEvent]] = relationship(
+        back_populates="household",
+        cascade="all, delete-orphan",
+    )
 
 
 class PantryLot(Base):
@@ -162,3 +166,21 @@ class AcceptedPlan(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
     household: Mapped[Household] = relationship(back_populates="accepted_plans")
+
+
+class ConsentEvent(Base):
+    __tablename__ = "consent_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    consent_type: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    scope: Mapped[str] = mapped_column(String(120), nullable=False, default="household")
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    actor: Mapped[str] = mapped_column(String(80), nullable=False, default="demo-user")
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    source: Mapped[str] = mapped_column(String(80), nullable=False, default="user_action")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    household: Mapped[Household] = relationship(back_populates="consent_events")

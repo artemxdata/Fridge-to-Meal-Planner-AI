@@ -47,6 +47,7 @@ live to avoid stale pantry, approval, and shopping decisions.
 V3 currently supports transparent context interpretation, explainable plan options, and durable plan
 approval/override events backed by persistence and audit history.
 Household-scoped routes use a shared dependency to reject unknown households before domain operations run.
+Privacy-sensitive retention and training permissions are tracked as append-only consent events.
 
 ## Decision Flow
 
@@ -91,6 +92,10 @@ project a practical perception path before expensive OCR/CV work, while preservi
 V3 observation sessions persist candidates as pending records, so the gap between perception and confirmed
 pantry facts is auditable.
 
+Photo, receipt, analytics, research, and model-training permissions are modeled separately from perception
+itself. A user can grant, deny, or revoke consent, and the current consent state is derived from the latest
+append-only event per `consent_type + scope`.
+
 ## Persistence
 
 The current persistence increment uses async SQLAlchemy with SQLite fallback and PostgreSQL in Docker Compose.
@@ -108,15 +113,15 @@ Implemented now:
 - deterministic companion state for explainable plan feedback;
 - append-only approval events for plan approval and override;
 - append-only approval events for item-level shopping decisions;
+- append-only consent events for private data retention, analytics, research, and model-training opt-in/out;
 - append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions;
-- initial Alembic migration for the current persistence schema.
+- Alembic migrations for the current persistence schema.
 - centralized household existence checks for v3 household-scoped routes.
 
 Still planned:
 
 - households and users;
 - purchase events;
-- consent events.
 
 All records must be scoped by `household_id`. Cross-household access tests are mandatory before exposing
 authentication.
