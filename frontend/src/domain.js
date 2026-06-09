@@ -102,3 +102,19 @@ export function buildShoppingDecisionPayload({ acceptedPlanId, item, index, deci
 
   return payload;
 }
+
+export function buildPurchasePayload({ acceptedPlan, items }) {
+  return {
+    source: "shopping_list",
+    accepted_plan_id: acceptedPlan.id,
+    actor: "demo-user",
+    reason: "confirmed shopping list purchase",
+    items: items.map((item) => ({
+      name: item.name,
+      quantity: Number(item.missing_quantity || item.quantity || 1),
+      unit: item.unit || "pcs",
+      source: "shopping_list",
+      confidence: 1,
+    })),
+  };
+}

@@ -17,6 +17,26 @@ const responses = {
   },
   "/api/v3/households/demo-household/plans/accepted/latest": null,
   "/api/v3/households/demo-household/approval-events": [],
+  "/api/v3/households/demo-household/reports/summary": {
+    household_id: "demo-household",
+    period_days: 3,
+    has_accepted_plan: false,
+    accepted_plan_id: null,
+    generated_from: {},
+    metrics: [
+      {
+        key: "accepted_plan",
+        label: "Accepted plan",
+        value: "missing",
+        unit: null,
+        status: "action",
+        source: "accepted_plans",
+        explanation: "No user-approved plan is active for this household yet.",
+      },
+    ],
+    insights: ["Approve a draft plan before treating nutrition numbers as actionable."],
+    assistant_boundary: "This report is computed from confirmed pantry, approved plans, and user-recorded purchases.",
+  },
   "/api/v2/perception/parse": {
     items: [
       {

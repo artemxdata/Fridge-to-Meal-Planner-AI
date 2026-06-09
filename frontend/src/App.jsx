@@ -1,4 +1,5 @@
 import Activity from "lucide-react/dist/esm/icons/activity.js";
+import BarChart3 from "lucide-react/dist/esm/icons/bar-chart-3.js";
 import Camera from "lucide-react/dist/esm/icons/camera.js";
 import Check from "lucide-react/dist/esm/icons/check.js";
 import ClipboardCheck from "lucide-react/dist/esm/icons/clipboard-check.js";
@@ -16,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   buildPlanOverridePayload,
   buildPlanPayload,
+  buildPurchasePayload,
   buildShoppingDecisionPayload,
   candidateConfirmations,
   companionTone,
@@ -102,6 +104,7 @@ function App() {
   const [shoppingDecisions, setShoppingDecisions] = useState({});
   const [overrideNotes, setOverrideNotes] = useState({});
   const [companion, setCompanion] = useState(null);
+  const [summaryReport, setSummaryReport] = useState(null);
   const [form, setForm] = useState(initialForm);
   const [receiptText, setReceiptText] = useState("yogurt 2 pcs\npotato 3 kg\neggs 10 pcs");
   const [barcodeText, setBarcodeText] = useState("4600000000011");
@@ -114,6 +117,7 @@ function App() {
     accepted: "No accepted plan yet.",
     context: "",
     companion: "Generate a draft plan to update the companion.",
+    report: "Approve a plan or record purchases to generate a report.",
   });
 
   const metrics = useMemo(
@@ -188,7 +192,11 @@ function App() {
       const household = await api("/api/v3/households/demo");
       setHouseholdId(household.id);
       setStatusKey("workspace", `Household: ${household.name}`);
-      await Promise.all([loadAcceptedPlan(household.id), loadApprovalEvents(household.id)]);
+      await Promise.all([
+        loadAcceptedPlan(household.id),
+        loadApprovalEvents(household.id),
+        loadSummaryReport(household.id),
+      ]);
       return household.id;
     } catch (error) {
       setStatusKey("workspace", error.message);
@@ -238,6 +246,22 @@ function App() {
       }
     } catch (error) {
       setStatusKey("accepted", error.message);
+    }
+  }
+
+  async function loadSummaryReport(id = householdId) {
+    if (!id) return;
+    try {
+      const params = new URLSearchParams({
+        period_days: "3",
+        protein_goal_g: String(Number(form.protein || 95)),
+        budget_per_day: String(Number(form.budget || 520)),
+      });
+      const data = await api(`/api/v3/households/${id}/reports/summary?${params.toString()}`);
+      setSummaryReport(data);
+      setStatusKey("report", data.assistant_boundary);
+    } catch (error) {
+      setStatusKey("report", error.message);
     }
   }
 
@@ -507,6 +531,7 @@ function App() {
         approval_event_id: event.id,
       });
       await Promise.all([loadAcceptedPlan(id), loadApprovalEvents(id)]);
+      await loadSummaryReport(id);
     } catch (error) {
       setStatusKey("plan", error.message);
     } finally {
@@ -572,10 +597,51 @@ function App() {
         item_index: index,
       });
       await loadApprovalEvents(id);
+      await loadSummaryReport(id);
     } catch (error) {
       setStatusKey("accepted", error.message);
     } finally {
       setBusyKey(busyKey, false);
+    }
+  }
+
+  async function recordShoppingPurchase() {
+    const shoppingItems = acceptedPlan?.shopping_list_payload || [];
+    if (!acceptedPlan?.id || !shoppingItems.length) {
+      setStatusKey("accepted", "Accepted plan has no shopping items to record as a purchase.");
+      return;
+    }
+
+    try {
+      setBusyKey("purchase", true);
+      const id = householdId || (await loadHousehold());
+      const payload = buildPurchasePayload({ acceptedPlan, items: shoppingItems });
+      const purchase = await api(`/api/v3/households/${id}/purchases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setStatusKey("accepted", `Purchase recorded: ${purchase.pantry_lots.length} pantry lots added.`);
+      addHistory("purchase", `Recorded ${purchase.pantry_lots.length} shopping items into pantry`, {
+        purchase_event_id: purchase.event.id,
+        accepted_plan_id: acceptedPlan.id,
+      });
+      setPantry((items) => [
+        ...items,
+        ...purchase.pantry_lots.map((lot) => ({
+          name: lot.display_name,
+          quantity: lot.quantity,
+          unit: lot.unit,
+          expires_in_days: lot.expires_in_days,
+          source: lot.source,
+          confidence: lot.confidence,
+        })),
+      ]);
+      await Promise.all([loadSummaryReport(id), loadApprovalEvents(id)]);
+    } catch (error) {
+      setStatusKey("accepted", error.message);
+    } finally {
+      setBusyKey("purchase", false);
     }
   }
 
@@ -717,11 +783,19 @@ function App() {
                 busy={busy}
                 decisions={shoppingDecisions}
                 onShoppingDecision={decideShoppingItem}
+                onRecordPurchase={recordShoppingPurchase}
                 plan={acceptedPlan}
                 status={status.accepted}
               />
             </div>
             <div>
+              <h2>Operations Report</h2>
+              <div className="toolbar compact">
+                <IconButton icon={BarChart3} className="light" onClick={() => loadSummaryReport()}>
+                  Refresh report
+                </IconButton>
+              </div>
+              <ReportPanel report={summaryReport} status={status.report} />
               <h2>Approval Events</h2>
               <IconButton icon={RefreshCw} className="light" onClick={() => loadApprovalEvents()}>
                 Refresh
@@ -1010,9 +1084,10 @@ function ShoppingList({ busy = {}, decisions = {}, items, onDecision }) {
   );
 }
 
-function AcceptedPlan({ busy, decisions, onShoppingDecision, plan, status }) {
+function AcceptedPlan({ busy, decisions, onRecordPurchase, onShoppingDecision, plan, status }) {
   if (!plan) return <div className="empty">{status}</div>;
   const totals = plan.plan_payload?.totals || {};
+  const shoppingItems = plan.shopping_list_payload || [];
   return (
     <div className="accepted-card">
       <Pill tone="good">{plan.status}</Pill>
@@ -1022,12 +1097,68 @@ function AcceptedPlan({ busy, decisions, onShoppingDecision, plan, status }) {
         <Pill>{totals.cost || 0} rub</Pill>
         <Pill>{totals.protein_g || 0}g protein</Pill>
       </div>
+      <div className="toolbar compact">
+        <IconButton
+          icon={ShoppingBasket}
+          className="secondary"
+          disabled={busy.purchase || !shoppingItems.length}
+          onClick={onRecordPurchase}
+        >
+          {busy.purchase ? "Recording" : "Record purchase"}
+        </IconButton>
+      </div>
       <ShoppingList
         busy={busy}
         decisions={decisions}
-        items={plan.shopping_list_payload || []}
+        items={shoppingItems}
         onDecision={onShoppingDecision}
       />
+    </div>
+  );
+}
+
+function ReportPanel({ report, status }) {
+  if (!report) return <div className="empty">{status}</div>;
+  const toneByStatus = {
+    good: "good",
+    watch: "watch",
+    action: "action",
+    neutral: "neutral",
+  };
+
+  return (
+    <div className="report-panel">
+      <div className="report-head">
+        <Pill tone={report.has_accepted_plan ? "good" : "action"}>
+          {report.has_accepted_plan ? "Accepted plan" : "No accepted plan"}
+        </Pill>
+        <span>{report.period_days} days</span>
+      </div>
+      <div className="report-grid">
+        {(report.metrics || []).map((metric) => (
+          <div className="report-metric" key={metric.key}>
+            <div>
+              <span>{metric.label}</span>
+              <b>
+                {metric.value ?? "-"}
+                {metric.unit ? ` ${metric.unit}` : ""}
+              </b>
+            </div>
+            <Pill tone={toneByStatus[metric.status] || "neutral"}>{metric.status}</Pill>
+            <p>{metric.explanation}</p>
+          </div>
+        ))}
+      </div>
+      {report.insights?.length ? (
+        <div className="insight-list">
+          {report.insights.map((insight) => (
+            <div className="insight" key={insight}>
+              {insight}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <div className="status">{status}</div>
     </div>
   );
 }

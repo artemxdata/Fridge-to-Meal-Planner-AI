@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlanOverridePayload,
   buildPlanPayload,
+  buildPurchasePayload,
   buildShoppingDecisionPayload,
   candidateConfirmations,
   companionTone,
@@ -105,5 +106,25 @@ describe("frontend domain helpers", () => {
       reason: "human changed this shopping item before buying",
     });
     expect(payload.override_payload.original_item.name).toBe("beans");
+  });
+
+  it("builds purchase payload from accepted shopping list items", () => {
+    const payload = buildPurchasePayload({
+      acceptedPlan: { id: "accepted-1" },
+      items: [
+        { name: "milk", missing_quantity: 2, unit: "pcs" },
+        { name: "beans", quantity: 1, unit: "can" },
+      ],
+    });
+
+    expect(payload).toMatchObject({
+      source: "shopping_list",
+      accepted_plan_id: "accepted-1",
+      reason: "confirmed shopping list purchase",
+    });
+    expect(payload.items).toEqual([
+      { name: "milk", quantity: 2, unit: "pcs", source: "shopping_list", confidence: 1 },
+      { name: "beans", quantity: 1, unit: "can", source: "shopping_list", confidence: 1 },
+    ]);
   });
 });
