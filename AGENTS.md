@@ -50,8 +50,8 @@
 После backend-изменений запускай:
 
 ```powershell
-.\.venv\Scripts\ruff.exe check app tests run_ultra_smart_app.py
-.\.venv\Scripts\black.exe --check app tests run_ultra_smart_app.py
+.\.venv\Scripts\ruff.exe check app tests run_ultra_smart_app.py run_local_demo.py
+.\.venv\Scripts\black.exe --check app tests run_ultra_smart_app.py run_local_demo.py
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 

@@ -74,8 +74,12 @@ Python 3.14 environment, but the optional CV stack may not.
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt -r requirements-dev.txt
-python run_ultra_smart_app.py
+python run_local_demo.py
 ```
+
+`run_local_demo.py` is the safest local demo entrypoint: it uses SQLite even if your private `.env` points to
+Docker/PostgreSQL. Use `run_ultra_smart_app.py` only when you intentionally want the normal environment-backed
+configuration.
 
 Open:
 
@@ -99,7 +103,7 @@ Production React PWA build served by FastAPI:
 cd frontend
 npm.cmd run build
 cd ..
-python run_ultra_smart_app.py
+python run_local_demo.py
 ```
 
 Open `http://127.0.0.1:8000/pwa`. The compatibility demo remains available at `/app`.
@@ -192,8 +196,8 @@ curl "http://127.0.0.1:8000/api/v3/households/demo-household/reports/summary?per
 ## Development Checks
 
 ```powershell
-.\.venv\Scripts\ruff.exe check app tests migrations run_ultra_smart_app.py
-.\.venv\Scripts\black.exe --check app tests migrations run_ultra_smart_app.py
+.\.venv\Scripts\ruff.exe check app tests migrations run_ultra_smart_app.py run_local_demo.py
+.\.venv\Scripts\black.exe --check app tests migrations run_ultra_smart_app.py run_local_demo.py
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\alembic.exe upgrade head
 cd frontend
