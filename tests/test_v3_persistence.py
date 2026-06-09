@@ -463,6 +463,85 @@ def test_purchase_event_rejects_missing_accepted_plan() -> None:
     assert response.json()["detail"] == "Accepted plan not found"
 
 
+def test_consumption_event_records_self_reported_meal_and_updates_summary_report() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    option = _draft_plan_option()
+    approval = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={
+            "actor": "test-user",
+            "reason": "approved before meal logging",
+            "option": option,
+        },
+    ).json()
+    accepted_plan_id = approval["approved_payload"]["accepted_plan_id"]
+
+    response = client.post(
+        f"/api/v3/households/{household_id}/consumption-events",
+        json={
+            "accepted_plan_id": accepted_plan_id,
+            "day": 1,
+            "meal": "breakfast",
+            "status": "consumed",
+            "servings": 1,
+            "actor": "test-user",
+            "reason": "ate the planned breakfast",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    event = data["event"]
+    assert event["accepted_plan_id"] == accepted_plan_id
+    assert event["status"] == "consumed"
+    assert event["meal"] == "breakfast"
+    assert event["recipe_title"]
+    assert event["nutrition_payload"]["protein_g"] > 0
+    assert "self-reported user facts" in data["assistant_boundary"]
+
+    events = client.get(
+        f"/api/v3/households/{household_id}/consumption-events",
+        params={"accepted_plan_id": accepted_plan_id},
+    ).json()
+    assert any(item["id"] == event["id"] for item in events)
+
+    report = client.get(
+        f"/api/v3/households/{household_id}/reports/summary",
+        params={"period_days": 3, "protein_goal_g": 95, "budget_per_day": 520},
+    ).json()
+    metrics = {item["key"]: item for item in report["metrics"]}
+    assert event["id"] in report["generated_from"]["consumption_event_ids"]
+    assert metrics["actual_protein"]["value"] >= event["nutrition_payload"]["protein_g"]
+    assert metrics["actual_protein_goal_coverage"]["unit"] == "%"
+    assert metrics["logged_meals"]["value"] >= 1
+
+    audit = client.get(f"/api/v3/households/{household_id}/audit-events").json()
+    assert any(item["event_type"] == "meal_consumed" and item["object_id"] == event["id"] for item in audit)
+
+
+def test_changed_consumption_event_requires_override_payload() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    option = _draft_plan_option()
+    approval = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={"actor": "test-user", "reason": "approved before changed meal", "option": option},
+    ).json()
+
+    response = client.post(
+        f"/api/v3/households/{household_id}/consumption-events",
+        json={
+            "accepted_plan_id": approval["approved_payload"]["accepted_plan_id"],
+            "day": 1,
+            "meal": "lunch",
+            "status": "changed",
+            "reason": "ate a different lunch",
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "override_payload is required for changed consumption events"
+
+
 def test_household_summary_report_uses_accepted_plan_and_purchase_history() -> None:
     household_id = client.get("/api/v3/households/demo").json()["id"]
     option = _draft_plan_option()
@@ -504,7 +583,7 @@ def test_household_summary_report_uses_accepted_plan_and_purchase_history() -> N
     assert metrics["purchase_events"]["value"] >= 1
     assert metrics["purchased_items"]["value"] >= 1
     assert metrics["purchase_total_cost"]["value"] >= 240
-    assert "does not prove what was actually eaten" in data["assistant_boundary"]
+    assert "self-reported consumption events" in data["assistant_boundary"]
 
 
 def test_override_plan_option_requires_reason_and_payload() -> None:
@@ -627,6 +706,16 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
             "reason": "test purchase",
         },
     )
+    consumption_history = client.get("/api/v3/households/unknown-household/consumption-events")
+    consumption_create = client.post(
+        "/api/v3/households/unknown-household/consumption-events",
+        json={
+            "accepted_plan_id": "missing-plan",
+            "day": 1,
+            "meal": "breakfast",
+            "reason": "test consumption",
+        },
+    )
     report = client.get("/api/v3/households/unknown-household/reports/summary")
 
     assert approval_events.status_code == 404
@@ -639,4 +728,6 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
     assert consent_create.status_code == 404
     assert purchases.status_code == 404
     assert purchase_create.status_code == 404
+    assert consumption_history.status_code == 404
+    assert consumption_create.status_code == 404
     assert report.status_code == 404

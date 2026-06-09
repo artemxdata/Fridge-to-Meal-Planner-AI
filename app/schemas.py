@@ -393,6 +393,54 @@ class PurchaseRecordResponse(BaseModel):
     assistant_boundary: str
 
 
+ConsumptionStatus = Literal["consumed", "skipped", "changed"]
+
+
+class ConsumptionEventCreateRequest(BaseModel):
+    accepted_plan_id: str = Field(min_length=1, max_length=120)
+    day: int = Field(ge=1, le=14)
+    meal: str = Field(min_length=1, max_length=40)
+    status: ConsumptionStatus = "consumed"
+    servings: float = Field(default=1, ge=0, le=20)
+    actor: str = Field(default="demo-user", min_length=1, max_length=80)
+    reason: str = Field(default="user_confirmed_meal_consumption", min_length=1, max_length=500)
+    nutrition_payload: dict[str, Any] = Field(default_factory=dict)
+    override_payload: dict[str, Any] = Field(default_factory=dict)
+    consumed_at: str | None = Field(default=None, max_length=40)
+
+    @field_validator("accepted_plan_id", "meal", "actor", "reason")
+    @classmethod
+    def strip_consumption_text(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("consumed_at")
+    @classmethod
+    def strip_consumed_at(cls, value: str | None) -> str | None:
+        return value.strip() if value is not None else None
+
+
+class ConsumptionEventResponse(BaseModel):
+    id: str
+    household_id: str
+    accepted_plan_id: str
+    day: int
+    meal: str
+    status: str
+    servings: float
+    actor: str
+    reason: str
+    recipe_title: str | None
+    nutrition_payload: dict[str, Any]
+    override_payload: dict[str, Any]
+    consumed_at: str | None
+    created_at: str
+
+
+class ConsumptionRecordResponse(BaseModel):
+    event: ConsumptionEventResponse
+    assistant_boundary: str
+
+
 class ReportMetric(BaseModel):
     key: str
     label: str

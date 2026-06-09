@@ -57,6 +57,10 @@ class Household(Base):
         back_populates="household",
         cascade="all, delete-orphan",
     )
+    consumption_events: Mapped[list[ConsumptionEvent]] = relationship(
+        back_populates="household",
+        cascade="all, delete-orphan",
+    )
 
 
 class PantryLot(Base):
@@ -207,3 +211,24 @@ class PurchaseEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
 
     household: Mapped[Household] = relationship(back_populates="purchase_events")
+
+
+class ConsumptionEvent(Base):
+    __tablename__ = "consumption_events"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    household_id: Mapped[str] = mapped_column(ForeignKey("households.id"), nullable=False, index=True)
+    accepted_plan_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    day: Mapped[int] = mapped_column(Integer, nullable=False)
+    meal: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    servings: Mapped[float] = mapped_column(Float, nullable=False, default=1)
+    actor: Mapped[str] = mapped_column(String(80), nullable=False, default="demo-user")
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    recipe_title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    nutrition_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    override_payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    consumed_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, nullable=False)
+
+    household: Mapped[Household] = relationship(back_populates="consumption_events")

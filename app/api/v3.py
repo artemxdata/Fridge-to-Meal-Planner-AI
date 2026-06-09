@@ -9,6 +9,9 @@ from app.schemas import (
     CompanionStateResponse,
     ConsentEventCreateRequest,
     ConsentEventResponse,
+    ConsumptionEventCreateRequest,
+    ConsumptionEventResponse,
+    ConsumptionRecordResponse,
     ContextInterpretRequest,
     ContextInterpretResponse,
     CurrentConsentResponse,
@@ -44,6 +47,12 @@ from app.services.consents import (
     current_consent_response,
     get_current_consents,
     list_consent_events,
+)
+from app.services.consumption import (
+    consumption_event_response,
+    consumption_record_response,
+    list_consumption_events,
+    record_consumption_event,
 )
 from app.services.context import interpret_context
 from app.services.households import (
@@ -302,6 +311,39 @@ async def purchases(
 ) -> list[PurchaseEventResponse]:
     events = await list_purchase_events(session, household_id, max(1, min(limit, 100)))
     return [purchase_event_response(event) for event in events]
+
+
+@router.post("/households/{household_id}/consumption-events", response_model=ConsumptionRecordResponse)
+async def record_consumption(
+    household_id: str,
+    request: ConsumptionEventCreateRequest,
+    session: SessionDep,
+    _household: HouseholdDep,
+) -> ConsumptionRecordResponse:
+    try:
+        event = await record_consumption_event(session, household_id=household_id, request=request)
+    except LookupError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    return consumption_record_response(event)
+
+
+@router.get("/households/{household_id}/consumption-events", response_model=list[ConsumptionEventResponse])
+async def consumption_events(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+    accepted_plan_id: str | None = None,
+    limit: int = 50,
+) -> list[ConsumptionEventResponse]:
+    events = await list_consumption_events(
+        session,
+        household_id,
+        accepted_plan_id=accepted_plan_id,
+        limit=max(1, min(limit, 100)),
+    )
+    return [consumption_event_response(event) for event in events]
 
 
 @router.get("/households/{household_id}/reports/summary", response_model=HouseholdSummaryReportResponse)

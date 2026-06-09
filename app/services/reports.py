@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AcceptedPlan, PantryLot, PurchaseEvent
+from app.models import AcceptedPlan, ConsumptionEvent, PantryLot, PurchaseEvent
 from app.schemas import HouseholdSummaryReportResponse, ReportMetric
 
 
@@ -43,6 +43,20 @@ async def _purchase_events_for_plan(
     if accepted_plan_id:
         query = query.where(PurchaseEvent.accepted_plan_id == accepted_plan_id)
     result = await session.execute(query.order_by(PurchaseEvent.created_at.desc(), PurchaseEvent.id.desc()))
+    return list(result.scalars())
+
+
+async def _consumption_events_for_plan(
+    session: AsyncSession,
+    household_id: str,
+    accepted_plan_id: str | None,
+) -> list[ConsumptionEvent]:
+    query = select(ConsumptionEvent).where(ConsumptionEvent.household_id == household_id)
+    if accepted_plan_id:
+        query = query.where(ConsumptionEvent.accepted_plan_id == accepted_plan_id)
+    result = await session.execute(
+        query.order_by(ConsumptionEvent.created_at.desc(), ConsumptionEvent.id.desc())
+    )
     return list(result.scalars())
 
 
@@ -219,6 +233,104 @@ def _purchase_metrics(purchases: list[PurchaseEvent]) -> tuple[list[ReportMetric
     )
 
 
+def _nutrition_value(event: ConsumptionEvent, key: str, fallback_key: str | None = None) -> float:
+    payload = event.nutrition_payload or {}
+    return _safe_float(payload.get(key, payload.get(fallback_key or key)))
+
+
+def _consumption_metrics(
+    consumptions: list[ConsumptionEvent],
+    *,
+    period_days: int,
+    protein_goal_g: int,
+) -> tuple[list[ReportMetric], list[str], dict[str, Any]]:
+    logged_count = len(consumptions)
+    skipped_count = sum(1 for event in consumptions if event.status == "skipped")
+    changed_count = sum(1 for event in consumptions if event.status == "changed")
+    consumed_like = [event for event in consumptions if event.status in {"consumed", "changed"}]
+    actual_protein = round(sum(_nutrition_value(event, "protein_g", "protein") for event in consumed_like), 1)
+    actual_calories = round(sum(_nutrition_value(event, "calories") for event in consumed_like), 1)
+    protein_goal_total = max(0, protein_goal_g) * period_days
+    protein_ratio = 1.0 if protein_goal_total == 0 else actual_protein / protein_goal_total
+
+    insights = []
+    if not consumptions:
+        insights.append(
+            "No consumption events yet; actual nutrition remains unknown until the user logs meals."
+        )
+    elif protein_ratio < 0.8:
+        insights.append("Logged protein is below target; this is based only on self-reported consumed meals.")
+    if skipped_count:
+        insights.append("Some accepted meals were skipped; future planning can use this as feedback.")
+    if changed_count:
+        insights.append("Some meals were changed by the user; overrides can become ranking feedback later.")
+
+    protein_status = (
+        "neutral" if not consumptions else _status_from_ratio(protein_ratio, good=0.95, action=0.8)
+    )
+
+    return (
+        [
+            ReportMetric(
+                key="actual_protein",
+                label="Actual logged protein",
+                value=actual_protein,
+                unit="g",
+                status=protein_status,
+                source="consumption_events.nutrition_payload.protein_g",
+                explanation="Protein from self-reported consumed or changed meals.",
+            ),
+            ReportMetric(
+                key="actual_protein_goal_coverage",
+                label="Actual protein coverage",
+                value=round(protein_ratio * 100, 1) if consumptions else 0,
+                unit="%",
+                status=protein_status,
+                source="consumption_events + report parameters",
+                explanation="Compares logged protein with the report protein target.",
+            ),
+            ReportMetric(
+                key="actual_calories",
+                label="Actual logged calories",
+                value=actual_calories,
+                unit="kcal",
+                status="neutral",
+                source="consumption_events.nutrition_payload.calories",
+                explanation="Calories from self-reported consumed or changed meals.",
+            ),
+            ReportMetric(
+                key="logged_meals",
+                label="Logged meals",
+                value=logged_count,
+                unit="events",
+                status="good" if logged_count else "watch",
+                source="consumption_events",
+                explanation="Number of meal consumption decisions recorded by the user.",
+            ),
+            ReportMetric(
+                key="skipped_meals",
+                label="Skipped meals",
+                value=skipped_count,
+                unit="events",
+                status="watch" if skipped_count else "good",
+                source="consumption_events.status",
+                explanation="Accepted meals the user explicitly marked as skipped.",
+            ),
+            ReportMetric(
+                key="changed_meals",
+                label="Changed meals",
+                value=changed_count,
+                unit="events",
+                status="watch" if changed_count else "good",
+                source="consumption_events.status",
+                explanation="Accepted meals the user changed before logging consumption.",
+            ),
+        ],
+        insights,
+        {"consumption_event_ids": [event.id for event in consumptions]},
+    )
+
+
 async def build_household_summary_report(
     session: AsyncSession,
     *,
@@ -236,6 +348,12 @@ async def build_household_summary_report(
     )
     purchases = await _purchase_events_for_plan(session, household_id, plan.id if plan else None)
     purchase_metrics, purchase_insights, purchase_sources = _purchase_metrics(purchases)
+    consumptions = await _consumption_events_for_plan(session, household_id, plan.id if plan else None)
+    consumption_metrics, consumption_insights, consumption_sources = _consumption_metrics(
+        consumptions,
+        period_days=period_days,
+        protein_goal_g=protein_goal_g,
+    )
     pantry_lots_count = await _pantry_lots_count(session, household_id)
 
     return HouseholdSummaryReportResponse(
@@ -246,6 +364,7 @@ async def build_household_summary_report(
         generated_from={
             **plan_sources,
             **purchase_sources,
+            **consumption_sources,
             "pantry_lots_count": pantry_lots_count,
             "report_parameters": {
                 "period_days": period_days,
@@ -256,6 +375,7 @@ async def build_household_summary_report(
         metrics=[
             *plan_metrics,
             *purchase_metrics,
+            *consumption_metrics,
             ReportMetric(
                 key="current_pantry_lots",
                 label="Current pantry lots",
@@ -266,9 +386,9 @@ async def build_household_summary_report(
                 explanation="Number of confirmed pantry lots currently stored for this household.",
             ),
         ],
-        insights=plan_insights + purchase_insights,
+        insights=plan_insights + purchase_insights + consumption_insights,
         assistant_boundary=(
-            "This report is computed from confirmed pantry, approved plans, and user-recorded purchases. "
-            "It is not a medical diagnosis and does not prove what was actually eaten."
+            "This report is computed from confirmed pantry, approved plans, user-recorded purchases, "
+            "and self-reported consumption events. It is not a medical diagnosis."
         ),
     )

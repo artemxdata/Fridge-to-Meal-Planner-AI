@@ -59,7 +59,8 @@ Confirmed pantry + explicit preferences + proposed context
     -> ApprovalEvent after explicit approval or override
     -> item-level shopping decisions
     -> PurchaseEvent after explicit purchase confirmation
-    -> read-only household report over confirmed facts
+    -> ConsumptionEvent after explicit meal confirmation
+    -> read-only household report over confirmed and self-reported facts
 ```
 
 The current scoring engine is a deterministic baseline. OR-Tools CP-SAT will replace it when recipe units,
@@ -117,7 +118,9 @@ Implemented now:
 - append-only approval events for plan approval and override;
 - append-only approval events for item-level shopping decisions;
 - purchase events that add user-confirmed shopping results back into pantry lots;
-- read-only household summary reports for planned protein, budget, pantry usage, shopping load, and purchases;
+- append-only consumption events for consumed, skipped, and changed accepted meals;
+- read-only household summary reports for planned protein, actual logged protein, budget, pantry usage,
+  shopping load, purchases, and meal decisions;
 - append-only consent events for private data retention, analytics, research, and model-training opt-in/out;
 - append-only audit events for household creation, pantry confirmation, plan decisions, and shopping decisions;
 - Alembic migrations for the current persistence schema.
@@ -138,7 +141,7 @@ authentication.
 - Health endpoints separate liveness from readiness.
 - Optional CV dependencies are excluded from the core runtime.
 - The Docker entrypoint can run Alembic migrations before serving traffic.
-- Reports must be computed from confirmed facts and must not claim what the user actually ate.
+- Reports must separate planned nutrition from self-reported consumption and must not infer unlogged meals.
 - External LLM/VLM integrations must use timeouts, structured outputs, model versions, and graceful fallback.
 
 ## Known Gaps
