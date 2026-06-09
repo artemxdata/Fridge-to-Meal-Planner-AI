@@ -393,6 +393,27 @@ class PurchaseRecordResponse(BaseModel):
     assistant_boundary: str
 
 
+class ReportMetric(BaseModel):
+    key: str
+    label: str
+    value: float | int | str | None
+    unit: str | None = None
+    status: Literal["good", "watch", "action", "neutral"] = "neutral"
+    source: str
+    explanation: str
+
+
+class HouseholdSummaryReportResponse(BaseModel):
+    household_id: str
+    period_days: int
+    has_accepted_plan: bool
+    accepted_plan_id: str | None
+    generated_from: dict[str, Any]
+    metrics: list[ReportMetric]
+    insights: list[str]
+    assistant_boundary: str
+
+
 class PlanApprovalRequest(BaseModel):
     option: PlanOption
     actor: str = Field(default="demo-user", min_length=1, max_length=80)

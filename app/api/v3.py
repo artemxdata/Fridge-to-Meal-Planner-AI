@@ -13,6 +13,7 @@ from app.schemas import (
     ContextInterpretResponse,
     CurrentConsentResponse,
     HouseholdResponse,
+    HouseholdSummaryReportResponse,
     ObservationConfirmRequest,
     ObservationSessionCreateRequest,
     ObservationSessionResponse,
@@ -67,6 +68,7 @@ from app.services.purchases import (
     purchase_record_response,
     record_purchase_event,
 )
+from app.services.reports import build_household_summary_report
 
 router = APIRouter(prefix="/api/v3", tags=["Human-controlled planning v3"])
 
@@ -300,6 +302,24 @@ async def purchases(
 ) -> list[PurchaseEventResponse]:
     events = await list_purchase_events(session, household_id, max(1, min(limit, 100)))
     return [purchase_event_response(event) for event in events]
+
+
+@router.get("/households/{household_id}/reports/summary", response_model=HouseholdSummaryReportResponse)
+async def household_summary_report(
+    household_id: str,
+    session: SessionDep,
+    _household: HouseholdDep,
+    period_days: int = 3,
+    protein_goal_g: int = 100,
+    budget_per_day: float = 500,
+) -> HouseholdSummaryReportResponse:
+    return await build_household_summary_report(
+        session,
+        household_id=household_id,
+        period_days=max(1, min(period_days, 14)),
+        protein_goal_g=max(0, min(protein_goal_g, 1000)),
+        budget_per_day=max(1, budget_per_day),
+    )
 
 
 @router.get("/households/{household_id}/audit-events", response_model=list[AuditEventResponse])

@@ -463,6 +463,50 @@ def test_purchase_event_rejects_missing_accepted_plan() -> None:
     assert response.json()["detail"] == "Accepted plan not found"
 
 
+def test_household_summary_report_uses_accepted_plan_and_purchase_history() -> None:
+    household_id = client.get("/api/v3/households/demo").json()["id"]
+    option = _draft_plan_option()
+    approval = client.post(
+        f"/api/v3/households/{household_id}/plans/approve",
+        json={
+            "actor": "test-user",
+            "reason": "approved before reporting",
+            "option": option,
+        },
+    ).json()
+    accepted_plan_id = approval["approved_payload"]["accepted_plan_id"]
+    purchase = client.post(
+        f"/api/v3/households/{household_id}/purchases",
+        json={
+            "source": "manual",
+            "accepted_plan_id": accepted_plan_id,
+            "items": [{"name": "yogurt", "quantity": 3, "unit": "pcs"}],
+            "total_cost": 240,
+            "currency": "RUB",
+            "reason": "confirmed before report",
+        },
+    ).json()
+
+    report = client.get(
+        f"/api/v3/households/{household_id}/reports/summary",
+        params={"period_days": 3, "protein_goal_g": 95, "budget_per_day": 520},
+    )
+
+    assert report.status_code == 200
+    data = report.json()
+    metrics = {item["key"]: item for item in data["metrics"]}
+    assert data["has_accepted_plan"] is True
+    assert data["accepted_plan_id"] == accepted_plan_id
+    assert data["generated_from"]["accepted_plan_id"] == accepted_plan_id
+    assert purchase["event"]["id"] in data["generated_from"]["purchase_event_ids"]
+    assert metrics["planned_protein"]["value"] > 0
+    assert metrics["protein_goal_coverage"]["unit"] == "%"
+    assert metrics["purchase_events"]["value"] >= 1
+    assert metrics["purchased_items"]["value"] >= 1
+    assert metrics["purchase_total_cost"]["value"] >= 240
+    assert "does not prove what was actually eaten" in data["assistant_boundary"]
+
+
 def test_override_plan_option_requires_reason_and_payload() -> None:
     household_id = client.get("/api/v3/households/demo").json()["id"]
     option = _draft_plan_option()
@@ -583,6 +627,7 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
             "reason": "test purchase",
         },
     )
+    report = client.get("/api/v3/households/unknown-household/reports/summary")
 
     assert approval_events.status_code == 404
     assert latest_plan.status_code == 404
@@ -594,3 +639,4 @@ def test_unknown_household_returns_404_for_plan_decisions() -> None:
     assert consent_create.status_code == 404
     assert purchases.status_code == 404
     assert purchase_create.status_code == 404
+    assert report.status_code == 404

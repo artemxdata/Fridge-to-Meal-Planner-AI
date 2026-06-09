@@ -24,6 +24,7 @@ a final shopping list.
 - Approve or override a draft plan from the local demo UI and inspect persisted approval events.
 - Review the accepted plan and approve, skip, or change individual shopping-list items.
 - Record confirmed purchases and add bought items back into pantry history.
+- Generate a household summary report for planned protein, budget usage, pantry usage, shopping load, and purchases.
 - Record append-only consent events for photo/receipt retention, analytics, research, and model-training opt-in/out.
 - Apply visible policy constraints: allergies, disliked ingredients, no-shop mode, low-dishes mode, max cooking time, and strict budget.
 - Show an explainable companion state that reflects plan signals without judging the user or approving decisions.
@@ -41,6 +42,7 @@ Observation -> Candidate facts -> Human confirmation -> Deterministic planning
 - V3 plans are always drafts and always have `requires_approval=true`.
 - Plan approval and override events are persisted before a draft becomes accepted state.
 - Purchase records are explicit user-confirmed events that create confirmed pantry lots.
+- Reports are computed from confirmed facts and do not claim what the user actually ate.
 - Private data retention, analytics, research, and model-training consent is append-only and revocable.
 - Context interpretation proposes structured constraints but requires confirmation.
 - Existing `/api/v2/*` contracts remain available while the product evolves through `/api/v3/*`.
@@ -181,6 +183,12 @@ curl -X POST http://127.0.0.1:8000/api/v3/households/demo-household/purchases \
   -d '{"source":"shopping_list","items":[{"name":"milk","quantity":2,"unit":"pcs"}],"total_cost":180,"currency":"RUB","reason":"confirmed after shopping"}'
 ```
 
+Generate a summary report:
+
+```bash
+curl "http://127.0.0.1:8000/api/v3/households/demo-household/reports/summary?period_days=3&protein_goal_g=95&budget_per_day=520"
+```
+
 ## Development Checks
 
 ```powershell
@@ -219,6 +227,7 @@ The app now has a real persistence foundation:
 - `POST /api/v3/households/{household_id}/shopping-list/decide` records item-level shopping decisions.
 - `POST /api/v3/households/{household_id}/purchases` records confirmed purchases and creates pantry lots.
 - `GET /api/v3/households/{household_id}/purchases` returns purchase history.
+- `GET /api/v3/households/{household_id}/reports/summary` returns planned nutrition, budget, pantry, shopping, and purchase metrics.
 - `GET /api/v3/households/{household_id}/approval-events` returns append-only plan decision events.
 - `POST /api/v3/households/{household_id}/consent-events` records append-only consent decisions.
 - `GET /api/v3/households/{household_id}/consent-events` returns consent history.
@@ -244,6 +253,7 @@ current v3 persistence schema.
 - Production migrations are available through Alembic, but there is not yet a full backup/restore runbook.
 - Consent events are tracked, but there is not yet a full privacy settings UI.
 - Purchase events close the shopping loop, but there is not yet receipt reconciliation or spend analytics.
+- Reports summarize confirmed plans and purchases, but there are no consumption events yet.
 
 ## Roadmap
 
